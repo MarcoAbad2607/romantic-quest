@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Romantic Quest GO</title>
 
-  <!-- PWA opcional (si usas manifest y SW que ya te di) -->
   <meta name="theme-color" content="#0e0e12">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,6 +14,7 @@
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+
   <style>
     :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
     *{box-sizing:border-box}
@@ -44,7 +44,7 @@
 
     /* Overlay cámara + juego */
     #camOverlay{position:fixed;inset:0;background:#000;display:none;z-index:9999}
-    #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;/* SIN espejo */}
+    #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
     #camCanvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
     #camTopBar{
       position:absolute;top:0;left:0;right:0;display:flex;gap:8px;justify-content:flex-end;
@@ -60,6 +60,13 @@
     /* barra de errores/avisos */
     #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;
       background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
+
+    /* Modal de premio */
+    #rewardModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10001}
+    #rewardModal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+    #rewardModal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
+    #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
+    #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
   </style>
 </head>
 <body>
@@ -111,12 +118,28 @@
 <!-- avisos -->
 <div id="msgBar"></div>
 
+<!-- Modal de premio -->
+<div id="rewardModal">
+  <div class="backdrop"></div>
+  <div class="content">
+    <h3 id="rewardTitle" style="margin:0 0 8px 0;">¡Premio desbloqueado!</h3>
+    <p id="rewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
+    <img id="rewardImg" alt="Premio">
+    <div class="row">
+      <a id="rewardUseBtn" class="btn" target="_blank" rel="noopener">Usar cupón</a>
+      <button id="rewardCloseBtn" class="btn secondary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script>
 /* ========= CONFIG =========
   - radius: 50 km para pruebas
   - camImg: PNG/JPG que “aparece” sobre la cámara (colócalas en /models/)
+  - REWARDS: mensaje/imagen/enlace por parada cuando capturas
+  - DIFICULTAD: velocidad y movimiento de la carta en la cámara
 */
 const STOPS = [
   { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
@@ -137,6 +160,20 @@ const FINAL_DESTINATION = {
   lat: 20.5899, lng: -100.3881,
   text: "Has reunido todas las cartas. Hay una última sorpresa esperando por ti… ¿Vienes? 💛",
   linkText: "Navegar al destino final",
+};
+
+const REWARDS = {
+  cafe:   { title:"Cupón de café ☕", text:"¡Ganaste un cafecito a mi cuenta!", img:"models/cupon_cafe.png", url:"#cafe" },
+  parque: { title:"Cupón picnic 🌳", text:"Picnic bajo los árboles, yo invito.", img:"models/cupon_picnic.png", url:"#picnic" },
+  cine:   { title:"Cupón cine 🎬", text:"Noche de película y palomitas.", img:"models/cupon_cine.png", url:"#cine" }
+};
+
+/* DIFICULTAD (ajusta a gusto) */
+const DIFFICULTY = {
+  cardSpeedMin: 80,     // px/seg
+  cardSpeedMax: 180,    // px/seg
+  wobbleAmp: 6,         // px
+  wobbleFreq: 2.2       // Hz
 };
 /* ========= FIN CONFIG ========= */
 
@@ -299,7 +336,7 @@ function startGPS(){
 }
 document.getElementById('startBtn').addEventListener('click', startGPS);
 
-/* ===== CÁMARA + MINI-JUEGO ===== */
+/* ===== CÁMARA + MINI-JUEGO (con movimiento de la carta) ===== */
 const camOverlay = document.getElementById('camOverlay');
 const camVideo   = document.getElementById('camVideo');
 const camCanvas  = document.getElementById('camCanvas');
@@ -311,24 +348,26 @@ let currentStop = null;
 
 let W=0,H=0,DPR=Math.max(1,window.devicePixelRatio||1);
 const ctx = camCanvas.getContext('2d');
-const imgCache = {};
 const placeholderDataURL =
   "data:image/svg+xml;charset=utf8," +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="960"><rect width="100%" height="100%" fill="#222"/><text x="50%" y="50%" fill="#fff" font-size="28" text-anchor="middle">Imagen no encontrada</text></svg>');
 
-const game = { card:null, ball:null, gravity:1800, swipe:{active:false,sx:0,sy:0,ex:0,ey:0}, running:false, last:0 };
+const game = {
+  card:null,      // {x,y,w,h,img, vx, vy, t}
+  ball:null,      // {x,y,r,vx,vy,flying}
+  gravity:1800,
+  swipe:{active:false,sx:0,sy:0,ex:0,ey:0},
+  running:false, last:0
+};
 
 function loadImage(src){
-  // Carga robusta con fallback
   return new Promise((resolve)=>{
     const im=new Image();
     im.onload=()=>resolve(im);
     im.onerror=()=>{
       console.warn("No se pudo cargar imagen:", src);
       showMsg("No se encontró la carta: " + src);
-      const ph = new Image();
-      ph.onload=()=>resolve(ph);
-      ph.src = placeholderDataURL;
+      const ph = new Image(); ph.onload=()=>resolve(ph); ph.src = placeholderDataURL;
     };
     im.src=src;
   });
@@ -365,7 +404,14 @@ async function openCamera(stop){
   const cardW = Math.min(W*0.42, 320), cardH = cardW*1.5;
   const cardX = (W-cardW)/2;
   const cardY = H*0.22;
-  game.card = {x:cardX,y:cardY,w:cardW,h:cardH,img:cardImg};
+
+  // Velocidad aleatoria dentro de rango (más difícil)
+  const speed = rand(DIFFICULTY.cardSpeedMin, DIFFICULTY.cardSpeedMax);
+  const angle = rand(0, Math.PI*2);
+  const vx = Math.cos(angle) * speed;
+  const vy = Math.sin(angle) * speed;
+
+  game.card = {x:cardX,y:cardY,w:cardW,h:cardH,img:cardImg, vx, vy, t:0};
 
   const r = Math.max(22, W*0.055);
   game.ball = {x: W*0.5, y: H*0.82, r, vx:0, vy:0, flying:false};
@@ -413,7 +459,7 @@ function onUp(){
   const mag=Math.hypot(dx,dy);
   if(mag<12){ game.swipe.active=false; return; }
   const ang=Math.atan2(dy,dx);
-  const speed=Math.min(1,mag/220)*1400;
+  const speed=Math.min(1,mag/220)*1500; // un poco más rápida para compensar movimiento
   b.vx=Math.cos(ang)*speed;
   b.vy=Math.sin(ang)*speed;
   b.flying=true;
@@ -428,30 +474,50 @@ function loop(ts){
 
   const b=game.ball, t=game.card;
 
-  if(b && b.flying){
-    b.vy += game.gravity*dt;
-    b.x += b.vx*dt;
-    b.y += b.vy*dt;
+  // Mover carta con rebotes y wobble
+  if(t){
+    t.t += dt;
+    t.x += t.vx * dt;
+    t.y += t.vy * dt;
+
+    const wobble = Math.sin(t.t * (Math.PI * 2 * DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
+    // Rebotes (márgenes)
+    if(t.x < 6) { t.x = 6; t.vx *= -1; }
+    if(t.x + t.w > W-6) { t.x = W-6 - t.w; t.vx *= -1; }
+    if(t.y < 6) { t.y = 6; t.vy *= -1; }
+    if(t.y + t.h > H*0.9) { t.y = H*0.9 - t.h; t.vy *= -1; }
+
+    ctx.clearRect(0,0,W,H);
+    ctx.drawImage(t.img, t.x, t.y + wobble, t.w, t.h);
+  } else {
+    ctx.clearRect(0,0,W,H);
+  }
+
+  // Bola con física
+  if(b){
+    if(b.flying){
+      b.vy += game.gravity*dt;
+      b.x += b.vx*dt;
+      b.y += b.vy*dt;
+    }
     if(b.x<b.r){ b.x=b.r; b.vx*=-0.4; }
     if(b.x>W-b.r){ b.x=W-b.r; b.vx*=-0.4; }
     if(b.y>H-b.r){ b.y=H-b.r; b.vy*=-0.35; b.vx*=0.96; if(Math.abs(b.vy)<60){ b.vy=0; b.flying=false; } }
-  }
 
-  ctx.clearRect(0,0,W,H);
-  if(t){ ctx.drawImage(t.img, t.x, t.y, t.w, t.h); }
-
-  if(b){
+    // dibujar bola
     ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fillStyle="#ff5a7a"; ctx.fill();
     ctx.save(); ctx.translate(b.x,b.y-2); ctx.fillStyle="#fff"; heartPath(ctx,b.r*0.38); ctx.fill(); ctx.restore();
     ctx.beginPath(); ctx.arc(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.22,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fill();
   }
 
+  // Línea guía
   if(game.swipe.active){
     ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(game.swipe.sx,game.swipe.sy);
     ctx.lineTo(game.swipe.ex,game.swipe.ey); ctx.stroke();
   }
 
+  // Colisión bola vs carta
   if(b && t && b.x>t.x && b.x<t.x+t.w && b.y>t.y && b.y<t.y+t.h){
     onCaught(); return;
   }
@@ -474,11 +540,32 @@ function onCaught(){
   setTimeout(()=>{
     closeCamera();
     renderStops(lastDistances);
-    showMsg("¡Carta capturada! 💛");
+    showReward(currentStop?.id);
   }, 120);
 }
 closeCam.addEventListener('click', closeCamera);
 throwHintBtn.addEventListener('click', ()=>showMsg("Toca cerca de la bola y desliza hacia la carta. Más largo/recto = más velocidad.", 4200));
+
+function rand(min,max){ return Math.random()*(max-min)+min; }
+
+/* ===== REWARD MODAL ===== */
+const rewardModal = document.getElementById('rewardModal');
+const rewardTitle = document.getElementById('rewardTitle');
+const rewardText  = document.getElementById('rewardText');
+const rewardImg   = document.getElementById('rewardImg');
+const rewardUseBtn= document.getElementById('rewardUseBtn');
+const rewardCloseBtn = document.getElementById('rewardCloseBtn');
+
+function showReward(id){
+  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#premio" };
+  rewardTitle.textContent = r.title;
+  rewardText.textContent  = r.text;
+  rewardImg.src = r.img;
+  rewardUseBtn.href = r.url;
+  rewardModal.style.display = 'flex';
+}
+rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
+rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
 </script>
 </body>
 </html>
