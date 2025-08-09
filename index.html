@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Romantic Quest GO</title>
 
+  <!-- PWA opcional -->
   <meta name="theme-color" content="#0e0e12">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
 
-  <link rel="preconnect" href="https://unpkg.com" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+  <!-- Mapbox GL JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 
   <style>
     :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
@@ -57,7 +58,7 @@
       background:rgba(0,0,0,.35);padding:8px 12px;border-radius:10px
     }
 
-    /* barra de errores/avisos */
+    /* avisos */
     #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;
       background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
 
@@ -132,14 +133,18 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script>
 /* ========= CONFIG =========
+  1) Pega tu token de Mapbox:
+*/
+mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
+
+/*
+  2) Paradas y juego:
   - radius: 50 km para pruebas
-  - camImg: PNG/JPG que “aparece” sobre la cámara (colócalas en /models/)
+  - camImg: PNG/JPG que aparece sobre la cámara (colócalas en /models/)
   - REWARDS: mensaje/imagen/enlace por parada cuando capturas
-  - DIFICULTAD: velocidad y movimiento de la carta en la cámara
+  - DIFICULTAD: velocidad/movimiento de la carta
 */
 const STOPS = [
   { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
@@ -168,13 +173,7 @@ const REWARDS = {
   cine:   { title:"Cupón cine 🎬", text:"Noche de película y palomitas.", img:"models/cupon_cine.png", url:"#cine" }
 };
 
-/* DIFICULTAD (ajusta a gusto) */
-const DIFFICULTY = {
-  cardSpeedMin: 80,     // px/seg
-  cardSpeedMax: 180,    // px/seg
-  wobbleAmp: 6,         // px
-  wobbleFreq: 2.2       // Hz
-};
+const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFreq: 2.2 };
 /* ========= FIN CONFIG ========= */
 
 const STORAGE_KEY = "rqg_progress_v1";
@@ -194,27 +193,113 @@ function fmtMeters(m){
   const km = m/1000;
   return km >= 10 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
 }
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = x => x * Math.PI/180;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* -------- mapa -------- */
-const map = L.map('map', { zoomControl:true });
-const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'});
-tiles.addTo(map);
+/* -------- MAPA 3D (Mapbox GL) -------- */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v12', // o 'satellite-streets-v12'
+  center: [-100.389, 20.595], // [lng, lat]
+  zoom: 13,
+  pitch: 60,
+  bearing: -20,
+  antialias: true
+});
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
-const markers = {};
-function initMapView() {
-  if (STOPS.length) {
-    const group = L.featureGroup();
-    STOPS.forEach(s => group.addLayer(L.marker([s.lat, s.lng]).bindPopup(s.title)));
-    group.addLayer(L.marker([FINAL_DESTINATION.lat, FINAL_DESTINATION.lng]).bindPopup("Destino final 💛"));
-    group.addTo(map);
-    map.fitBounds(group.getBounds().pad(0.25));
+map.on('style.load', () => {
+  // Relieve
+  map.addSource('mapbox-dem', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
+  // Cielo
+  map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 0.0], 'sky-atmosphere-sun-intensity': 12 }});
+  // Edificios 3D
+  const labelLayerId = (map.getStyle().layers||[]).find(l=>l.type==='symbol')?.id;
+  map.addLayer({
+    id: '3d-buildings',
+    source: 'composite',
+    'source-layer': 'building',
+    filter: ['==', ['get', 'extrude'], 'true'],
+    type: 'fill-extrusion',
+    minzoom: 15,
+    paint: {
+      'fill-extrusion-color': '#b1b6c3',
+      'fill-extrusion-height': ['get', 'height'],
+      'fill-extrusion-base': ['get', 'min_height'],
+      'fill-extrusion-opacity': 0.6
+    }
+  }, labelLayerId);
+  addStopMarkers();
+});
+
+const stopMarkers = [];
+function addStopMarkers(){
+  stopMarkers.forEach(m => m.remove());
+  stopMarkers.length = 0;
+
+  // Paradas
+  for (const s of STOPS) {
+    const el = document.createElement('div');
+    el.style.width='16px'; el.style.height='16px'; el.style.borderRadius='50%';
+    el.style.border='2px solid #fff'; el.style.background='#3a3af6';
+    const mk = new mapboxgl.Marker(el).setLngLat([s.lng, s.lat])
+      .setPopup(new mapboxgl.Popup({ offset: 12 }).setText(s.title))
+      .addTo(map);
+    stopMarkers.push(mk);
+  }
+  // Final
+  const elf = document.createElement('div');
+  elf.style.width='18px'; elf.style.height='18px'; elf.style.borderRadius='50%';
+  elf.style.border='2px solid #fff'; elf.style.background='#ffd54d';
+  new mapboxgl.Marker(elf).setLngLat([FINAL_DESTINATION.lng, FINAL_DESTINATION.lat])
+    .setPopup(new mapboxgl.Popup({ offset: 12 }).setText('Destino final 💛')).addTo(map);
+}
+
+/* -------- RUTA hacia la siguiente parada -------- */
+let routeSourceAdded = false;
+function drawRoute(geojson){
+  if (!routeSourceAdded) {
+    map.addSource('route', { type:'geojson', data: geojson });
+    map.addLayer({
+      id:'route-line',
+      type:'line',
+      source:'route',
+      paint:{ 'line-color':'#ff5a7a', 'line-width': 6, 'line-opacity': 0.85 }
+    });
+    routeSourceAdded = true;
   } else {
-    map.setView([0,0],2);
+    map.getSource('route').setData(geojson);
   }
 }
-initMapView();
+function getNextStop(){
+  for (const s of STOPS) if (!found.has(s.id)) return s;
+  return null;
+}
+async function fetchAndDrawRoute(fromLngLat, toLngLat){
+  if (!toLngLat) return;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`;
+  try{
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]){
+      const gj = { type:'FeatureCollection', features:[{ type:'Feature', geometry:data.routes[0].geometry, properties:{} }] };
+      drawRoute(gj);
+      const coords = data.routes[0].geometry.coordinates;
+      const bounds = coords.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+      map.fitBounds(bounds, { padding: 60, pitch: map.getPitch(), bearing: map.getBearing(), duration: 800 });
+    }
+  }catch(e){ console.warn('No se pudo obtener la ruta', e); }
+}
 
-/* -------- UI -------- */
+/* -------- UI de paradas -------- */
 const stopsList = document.getElementById('stopsList');
 function renderStops(distanceMap = {}) {
   stopsList.innerHTML = "";
@@ -283,6 +368,8 @@ stopsList.addEventListener('click', (e)=>{
   btn.disabled = true;
   renderStops(lastDistances);
 });
+
+/* -------- GPS + Mi marcador + Ruta -------- */
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   localStorage.removeItem(STORAGE_KEY);
   found = new Set();
@@ -290,35 +377,39 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   showMsg("Progreso reiniciado. 🎯");
 });
 
-/* -------- GPS -------- */
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const toRad = x => x * Math.PI/180;
-  const dLat = toRad(lat2-lat1);
-  const dLon = toRad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 +
-            Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
-            Math.sin(dLon/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
 let watchId = null;
 let lastDistances = {};
+let myMarker = null;
+
 function updateDistances(pos){
   const { latitude:lat, longitude:lng } = pos.coords;
-  if (!updateDistances._centered) {
-    map.setView([lat,lng], 13);
-    updateDistances._centered = true;
-  }
-  if (!markers.me){
-    markers.me = L.circleMarker([lat,lng],{radius:8,weight:2,color:'#3a3af6'}).addTo(map);
+
+  // Mi marcador (azul)
+  if (!myMarker){
+    const el = document.createElement('div');
+    el.style.width='14px'; el.style.height='14px'; el.style.borderRadius='50%';
+    el.style.border='2px solid #fff'; el.style.background='#1e88ff';
+    myMarker = new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map);
+    map.easeTo({ center: [lng, lat], zoom: 14, duration: 600 });
   } else {
-    markers.me.setLatLng([lat,lng]);
+    myMarker.setLngLat([lng, lat]);
   }
+
+  // Distancias y UI
   const d = {};
   STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d;
   renderStops(d);
+
+  // Ruta a siguiente parada pendiente (throttle)
+  const next = getNextStop();
+  if (!next) return;
+  const me = [lng, lat];
+  const dest = [next.lng, next.lat];
+  clearTimeout(updateDistances._t);
+  updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 400);
 }
+
 function startGPS(){
   if(!('geolocation' in navigator)){
     alert("Tu navegador no permite geolocalización.");
@@ -328,15 +419,11 @@ function startGPS(){
   watchId = navigator.geolocation.watchPosition(updateDistances, (err)=>{
     console.warn(err);
     showMsg("No se pudo obtener tu ubicación. Revisa permisos.");
-  }, {
-    enableHighAccuracy:true,
-    maximumAge: 5000,
-    timeout: 15000
-  });
+  }, { enableHighAccuracy:true, maximumAge: 5000, timeout: 15000 });
 }
 document.getElementById('startBtn').addEventListener('click', startGPS);
 
-/* ===== CÁMARA + MINI-JUEGO (con movimiento de la carta) ===== */
+/* ===== CÁMARA + MINI-JUEGO (carta en movimiento) ===== */
 const camOverlay = document.getElementById('camOverlay');
 const camVideo   = document.getElementById('camVideo');
 const camCanvas  = document.getElementById('camCanvas');
@@ -348,17 +435,12 @@ let currentStop = null;
 
 let W=0,H=0,DPR=Math.max(1,window.devicePixelRatio||1);
 const ctx = camCanvas.getContext('2d');
+
 const placeholderDataURL =
   "data:image/svg+xml;charset=utf8," +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="960"><rect width="100%" height="100%" fill="#222"/><text x="50%" y="50%" fill="#fff" font-size="28" text-anchor="middle">Imagen no encontrada</text></svg>');
 
-const game = {
-  card:null,      // {x,y,w,h,img, vx, vy, t}
-  ball:null,      // {x,y,r,vx,vy,flying}
-  gravity:1800,
-  swipe:{active:false,sx:0,sy:0,ex:0,ey:0},
-  running:false, last:0
-};
+const game = { card:null, ball:null, gravity:1800, swipe:{active:false,sx:0,sy:0,ex:0,ey:0}, running:false, last:0 };
 
 function loadImage(src){
   return new Promise((resolve)=>{
@@ -405,7 +487,6 @@ async function openCamera(stop){
   const cardX = (W-cardW)/2;
   const cardY = H*0.22;
 
-  // Velocidad aleatoria dentro de rango (más difícil)
   const speed = rand(DIFFICULTY.cardSpeedMin, DIFFICULTY.cardSpeedMax);
   const angle = rand(0, Math.PI*2);
   const vx = Math.cos(angle) * speed;
@@ -451,7 +532,7 @@ function onMove(e){
   if(!game.swipe.active) return;
   const rect = camCanvas.getBoundingClientRect();
   game.swipe.ex = e.clientX-rect.left;
-  game.swipe.ey = e.clientY-rect.top;
+  game.swipe.ey = e.clientY-rect-top;
 }
 function onUp(){
   const b=game.ball; if(!game.swipe.active||!b||b.flying){ game.swipe.active=false; return; }
@@ -459,7 +540,7 @@ function onUp(){
   const mag=Math.hypot(dx,dy);
   if(mag<12){ game.swipe.active=false; return; }
   const ang=Math.atan2(dy,dx);
-  const speed=Math.min(1,mag/220)*1500; // un poco más rápida para compensar movimiento
+  const speed=Math.min(1,mag/220)*1500;
   b.vx=Math.cos(ang)*speed;
   b.vy=Math.sin(ang)*speed;
   b.flying=true;
@@ -474,14 +555,13 @@ function loop(ts){
 
   const b=game.ball, t=game.card;
 
-  // Mover carta con rebotes y wobble
+  // Mover carta + rebotes + wobble
   if(t){
     t.t += dt;
     t.x += t.vx * dt;
     t.y += t.vy * dt;
 
     const wobble = Math.sin(t.t * (Math.PI * 2 * DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
-    // Rebotes (márgenes)
     if(t.x < 6) { t.x = 6; t.vx *= -1; }
     if(t.x + t.w > W-6) { t.x = W-6 - t.w; t.vx *= -1; }
     if(t.y < 6) { t.y = 6; t.vy *= -1; }
@@ -493,7 +573,7 @@ function loop(ts){
     ctx.clearRect(0,0,W,H);
   }
 
-  // Bola con física
+  // Bola
   if(b){
     if(b.flying){
       b.vy += game.gravity*dt;
@@ -504,20 +584,19 @@ function loop(ts){
     if(b.x>W-b.r){ b.x=W-b.r; b.vx*=-0.4; }
     if(b.y>H-b.r){ b.y=H-b.r; b.vy*=-0.35; b.vx*=0.96; if(Math.abs(b.vy)<60){ b.vy=0; b.flying=false; } }
 
-    // dibujar bola
+    // dibujar
     ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fillStyle="#ff5a7a"; ctx.fill();
     ctx.save(); ctx.translate(b.x,b.y-2); ctx.fillStyle="#fff"; heartPath(ctx,b.r*0.38); ctx.fill(); ctx.restore();
     ctx.beginPath(); ctx.arc(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.22,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fill();
   }
 
-  // Línea guía
   if(game.swipe.active){
     ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(game.swipe.sx,game.swipe.sy);
     ctx.lineTo(game.swipe.ex,game.swipe.ey); ctx.stroke();
   }
 
-  // Colisión bola vs carta
+  // Colisión
   if(b && t && b.x>t.x && b.x<t.x+t.w && b.y>t.y && b.y<t.y+t.h){
     onCaught(); return;
   }
@@ -545,8 +624,6 @@ function onCaught(){
 }
 closeCam.addEventListener('click', closeCamera);
 throwHintBtn.addEventListener('click', ()=>showMsg("Toca cerca de la bola y desliza hacia la carta. Más largo/recto = más velocidad.", 4200));
-
-function rand(min,max){ return Math.random()*(max-min)+min; }
 
 /* ===== REWARD MODAL ===== */
 const rewardModal = document.getElementById('rewardModal');
