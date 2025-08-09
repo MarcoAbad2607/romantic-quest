@@ -12,10 +12,14 @@
   <style>
     :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--ink)}
     header{padding:16px 20px calc(16px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
     h1{margin:0;font-size:18px}
-    #map{height:46vh}
+
+    /* Mapa más grande por defecto */
+    #map{height:70vh}
+
     .wrap{padding:16px}
     .card{background:var(--card);border:1px solid #242438;border-radius:14px;padding:14px;margin:12px 0}
     .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -64,12 +68,28 @@
     #rewardModal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
     #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
     #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
+
+    /* Fallback de Pantalla Completa (iOS/otros sin Fullscreen API) */
+    body.is-fs header,
+    body.is-fs .wrap{display:none}
+    body.is-fs #map{
+      position:fixed; inset:0; height:100vh !important; width:100vw !important; z-index:9990;
+    }
+    body.is-fs .fs-exit{
+      position:fixed; top:12px; right:12px; z-index:9991;
+      background:#2a2a39; color:#fff; border:0; border-radius:10px; padding:10px 14px; font-weight:600;
+      display:block;
+    }
+    .fs-exit{display:none}
   </style>
 </head>
 <body>
 <header>
   <h1>Romantic Quest GO ✨</h1>
 </header>
+
+<!-- Botón de salida (visible solo en fallback de pantalla completa) -->
+<button id="fsExitBtn" class="fs-exit">Salir de pantalla completa</button>
 
 <div id="map"></div>
 
@@ -83,6 +103,7 @@
       <div class="flex">
         <button id="startBtn" class="btn">Iniciar GPS</button>
         <button id="walkBtn" class="btn secondary" title="Vista tipo caminar">Modo caminata</button>
+        <button id="fsBtn" class="btn secondary" title="Pantalla completa">Pantalla completa</button>
         <button id="resetBtn" class="btn secondary" title="Borrar cartas">Reiniciar</button>
       </div>
     </div>
@@ -98,7 +119,7 @@
   </div>
 
   <p class="footer-note">
-    Si algo no carga, recarga con <code>?v=6</code> al final de la URL (evita caché).
+    Tip: si algo no carga, abre con <code>?v=7</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -130,17 +151,10 @@
   </div>
 </div>
 
-<!-- Diagnóstico global: muestra cualquier error JS en un alert (útil en iPhone) -->
-<script>
-  window.onerror = (m, s, l, c, e)=>{ alert("JS error: " + m); console.error(m, s, l, c, e); };
-</script>
-
 <script>
 /* ========= CONFIG ========= */
-// Token Mapbox (tuyo):
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
-// Paradas y juego
 const STOPS = [
   { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
     title:"Nuestra primera charla ☕",
@@ -186,44 +200,19 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* ========= MAPA (streets-v11 para test estable) ========= */
-console.log('Mapbox soportado?', mapboxgl.supported());
+/* ========= MAPA PLANO estilo navegación ========= */
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/streets-v11', // luego puedes volver a 'satellite-streets-v11'
+  style: 'mapbox://styles/mapbox/navigation-day-v1', // plano, sin edificios
   center: [-100.389, 20.595],
-  zoom: 13,
+  zoom: 15.5,
   pitch: 60,
   bearing: -20,
   antialias: true
 });
-map.on('load', ()=> console.log('Mapa cargado'));
-map.on('error', (e)=> { console.error('[Mapbox ERROR]', e?.error); alert('Mapbox error: ' + (e?.error?.message || 'desconocido')); });
-
 map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
 map.on('style.load', () => {
-  // Terreno, cielo y edificios 3D (si el estilo los soporta)
-  map.addSource('mapbox-dem', { type:'raster-dem', url:'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize:512, maxzoom:14 });
-  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
-  map.addLayer({ id:'sky', type:'sky', paint:{ 'sky-type':'atmosphere', 'sky-atmosphere-sun':[0,0], 'sky-atmosphere-sun-intensity':12 } });
-
-  const labelLayerId = (map.getStyle().layers||[]).find(l=>l.type==='symbol')?.id;
-  map.addLayer({
-    id:'3d-buildings',
-    source:'composite',
-    'source-layer':'building',
-    filter:['==',['get','extrude'],'true'],
-    type:'fill-extrusion',
-    minzoom:15,
-    paint:{
-      'fill-extrusion-color':'#b1b6c3',
-      'fill-extrusion-height':['get','height'],
-      'fill-extrusion-base':['get','min_height'],
-      'fill-extrusion-opacity':0.6
-    }
-  }, labelLayerId);
-
   addStopMarkers();
 });
 
@@ -236,7 +225,6 @@ function addStopMarkers(){
     new mapboxgl.Marker(el).setLngLat([s.lng, s.lat])
       .setPopup(new mapboxgl.Popup({ offset:12 }).setText(s.title)).addTo(map);
   });
-  // Destino final
   const elf = document.createElement('div');
   elf.style.width='18px'; elf.style.height='18px'; elf.style.borderRadius='50%';
   elf.style.border='2px solid #fff'; elf.style.background='#ffd54d';
@@ -381,7 +369,7 @@ function updateDistances(pos){
   if (!myMarker){
     const el = document.createElement('div'); el.className='puck';
     myMarker = new mapboxgl.Marker(el, { rotationAlignment: 'map' }).setLngLat([lng, lat]).addTo(map);
-    map.easeTo({ center:[lng, lat], zoom:14, duration:600 });
+    map.easeTo({ center:[lng, lat], zoom:16, duration:600 });
   } else {
     myMarker.setLngLat([lng, lat]);
   }
@@ -406,21 +394,14 @@ function updateDistances(pos){
       const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
       const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
       const y=Math.sin(Δλ)*Math.cos(φ2);
-      const x=Math.cos(φ1)*sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ); // <-- corregimos debajo
-    }
-    // corrección: calculamos bearing hacia next si falta
-    if (walkingMode && bearing == null && next){
-      const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
-      const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
-      const y=Math.sin(Δλ)*Math.cos(φ2);
       const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
       bearing = (toDeg(Math.atan2(y,x))+360)%360;
     }
 
     map.easeTo({
       center: [lng, lat],
-      zoom: 18.2,
-      pitch: 75,
+      zoom: 18.3,   // más cerca “tipo Pokémon”
+      pitch: 55,    // inclinación sin edificios
       bearing: (typeof bearing === 'number') ? bearing : map.getBearing(),
       duration: 600
     });
@@ -442,6 +423,54 @@ function startGPS(){
   }, { enableHighAccuracy:true, maximumAge:1000, timeout:15000 });
 }
 document.getElementById('startBtn').addEventListener('click', startGPS);
+
+/* ========= Pantalla completa (con fallback para iOS) ========= */
+const fsBtn = document.getElementById('fsBtn');
+const fsExitBtn = document.getElementById('fsExitBtn');
+const mapEl = document.getElementById('map');
+
+function enterNativeFullscreen(){
+  const el = mapEl;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (req) { req.call(el); return true; }
+  return false;
+}
+function exitNativeFullscreen(){
+  const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+  if (ex) { ex.call(document); return true; }
+  return false;
+}
+function enterCssFullscreen(){
+  document.body.classList.add('is-fs');
+  fsExitBtn.style.display = 'block';
+  map.resize();
+}
+function exitCssFullscreen(){
+  document.body.classList.remove('is-fs');
+  fsExitBtn.style.display = 'none';
+  map.resize();
+}
+
+fsBtn.addEventListener('click', ()=>{
+  // Intenta nativo; si no, usa fallback CSS
+  const ok = enterNativeFullscreen();
+  if (!ok) enterCssFullscreen();
+});
+fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
+
+// Si cambia el estado nativo, ajusta el mapa y oculta/activa fallback
+['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
+  document.addEventListener(ev, ()=>{
+    const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+    if (inFs){
+      fsExitBtn.style.display = 'none'; // usando nativo, no fallback
+      map.resize();
+    } else {
+      // Si salimos del nativo, aseguramos que también esté fuera del fallback
+      exitCssFullscreen();
+    }
+  });
+});
 
 /* ========= CÁMARA + MINI-JUEGO ========= */
 const camOverlay = document.getElementById('camOverlay');
@@ -512,7 +541,7 @@ async function openCamera(stop){
 function closeCamera(){
   game.running=false;
   camCanvas.removeEventListener('pointerdown', onDown);
-  camCanvas.removeEventListener('pointermove', onMove);
+  camCanvas.removeEventListener('pointermove', on Move);
   camCanvas.removeEventListener('pointerup',   onUp);
   window.removeEventListener('resize', resizeCanvas);
   camOverlay.style.display = "none";
