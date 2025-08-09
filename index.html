@@ -25,7 +25,7 @@
     #map{height:46vh}
     .wrap{padding:16px}
     .card{background:var(--card);border:1px solid #242438;border-radius:14px;padding:14px;margin:12px 0}
-    .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px;font-weight:600;background:#3a3af6;color:white;cursor:pointer}
     .btn.secondary{background:#2a2a39}
     .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -68,6 +68,16 @@
     #rewardModal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
     #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
     #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
+
+    /* STREET VIEW overlay */
+    #svOverlay{position:fixed; inset:0; z-index:9998; background:#000; display:none}
+    #svPanel{position:absolute; inset:0}
+    #svTopBar{
+      position:absolute; top:10px; left:10px; right:10px;
+      display:flex; gap:8px; justify-content:space-between; align-items:center;
+      z-index:2; pointer-events:none;
+    }
+    #svTopBar .btn, #svTopBar .tag { pointer-events:auto; }
   </style>
 </head>
 <body>
@@ -84,8 +94,9 @@
         <div class="big">Progreso</div>
         <div class="footer-note" id="progressText">0 de 0 cartas</div>
       </div>
-      <div class="flex" style="gap:8px;">
+      <div class="flex">
         <button id="startBtn" class="btn">Iniciar GPS</button>
+        <button id="streetBtn" class="btn secondary">Street View</button>
         <button id="resetBtn" class="btn secondary" title="Borrar cartas capturadas">Reiniciar</button>
       </div>
     </div>
@@ -114,6 +125,15 @@
     <button id="throwHintBtn">¿Cómo lanzar?</button>
   </div>
   <div id="camHint">Toca cerca de la bola y desliza hacia la carta para lanzarla ❤️</div>
+</div>
+
+<!-- STREET VIEW overlay -->
+<div id="svOverlay">
+  <div id="svPanel"></div>
+  <div id="svTopBar">
+    <span id="svHint" class="tag">Vista calle · orientada a la siguiente parada</span>
+    <button id="svClose" class="btn secondary">Cerrar</button>
+  </div>
 </div>
 
 <!-- avisos -->
@@ -187,7 +207,7 @@ function rand(min,max){ return Math.random()*(max-min)+min; }
 /* ========= MAPA 3D (Mapbox GL v2.15) ========= */
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/streets-v11', // puedes probar 'satellite-streets-v11'
+  style: 'mapbox://styles/mapbox/streets-v11', // prueba 'satellite-streets-v11' si quieres
   center: [-100.389, 20.595],
   zoom: 13,
   pitch: 60,
@@ -195,23 +215,15 @@ const map = new mapboxgl.Map({
   antialias: true
 });
 
-// Logger de errores (útil en iPhone)
-map.on('error', (e) => {
-  console.error('[Mapbox ERROR]', e && e.error);
-  if (e?.error?.message) alert('Mapbox: ' + e.error.message);
-});
+map.on('error', (e) => { console.error('[Mapbox ERROR]', e && e.error); });
 
 map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
 map.on('style.load', () => {
-  // Terreno (DEM)
   map.addSource('mapbox-dem', { type:'raster-dem', url:'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize:512, maxzoom:14 });
   map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
-
-  // Cielo
   map.addLayer({ id:'sky', type:'sky', paint:{ 'sky-type':'atmosphere', 'sky-atmosphere-sun':[0,0], 'sky-atmosphere-sun-intensity':12 } });
 
-  // Edificios 3D
   const labelLayerId = (map.getStyle().layers||[]).find(l=>l.type==='symbol')?.id;
   map.addLayer({
     id:'3d-buildings',
@@ -361,7 +373,7 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   showMsg("Progreso reiniciado. 🎯");
 });
 
-/* ========= GPS + marcador propio + ruta ========= */
+/* ========= GPS + marcador + ruta + STREET VIEW hook ========= */
 let watchId = null;
 let lastDistances = {};
 let myMarker = null;
@@ -386,6 +398,9 @@ function updateDistances(pos){
   const me = [lng, lat], dest = [next.lng, next.lat];
   clearTimeout(updateDistances._t);
   updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 400);
+
+  // Actualiza Street View si está abierto
+  updateStreetViewForPosition(lat, lng);
 }
 
 function startGPS(){
@@ -504,38 +519,30 @@ function loop(ts){
   const dt = Math.min(0.033, (ts-game.last)/1000); game.last = ts;
   const b=game.ball, t=game.card;
 
-  // Carta en movimiento + rebotes + “wobble”
   if(t){
     t.t += dt; t.x += t.vx*dt; t.y += t.vy*dt;
     const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
     if(t.x<6){ t.x=6; t.vx*=-1; } if(t.x+t.w>W-6){ t.x=W-6-t.w; t.vx*=-1; }
     if(t.y<6){ t.y=6; t.vy*=-1; } if(t.y+t.h>H*0.9){ t.y=H*0.9-t.h; t.vy*=-1; }
-
     ctx.clearRect(0,0,W,H);
     ctx.drawImage(t.img, t.x, t.y+wobble, t.w, t.h);
-  } else {
-    ctx.clearRect(0,0,W,H);
-  }
+  } else { ctx.clearRect(0,0,W,H); }
 
-  // Bola con física simple
   if(b){
     if(b.flying){ b.vy += game.gravity*dt; b.x += b.vx*dt; b.y += b.vy*dt; }
     if(b.x<b.r){ b.x=b.r; b.vx*=-0.4; }
     if(b.x>W-b.r){ b.x=W-b.r; b.vx*=-0.4; }
     if(b.y>H-b.r){ b.y=H-b.r; b.vy*=-0.35; b.vx*=0.96; if(Math.abs(b.vy)<60){ b.vy=0; b.flying=false; } }
-
     ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fillStyle="#ff5a7a"; ctx.fill();
     ctx.save(); ctx.translate(b.x,b.y-2); ctx.fillStyle="#fff"; heartPath(ctx,b.r*0.38); ctx.fill(); ctx.restore();
     ctx.beginPath(); ctx.arc(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.22,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fill();
   }
 
-  // Línea guía de swipe
   if(game.swipe.active){
     ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(game.swipe.sx,game.swipe.sy); ctx.lineTo(game.swipe.ex,game.swipe.ey); ctx.stroke();
   }
 
-  // Colisión bola vs carta
   if(b && t && b.x>t.x && b.x<t.x+t.w && b.y>t.y && b.y<t.y+t.h){ onCaught(); return; }
 
   requestAnimationFrame(loop);
@@ -572,6 +579,72 @@ rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModa
 
 closeCam.addEventListener('click', closeCamera);
 throwHintBtn.addEventListener('click', ()=>showMsg("Toca cerca de la bola y desliza hacia la carta. Más largo/recto = más velocidad.", 4200));
+
+/* ========= STREET VIEW (Google) ========= */
+let svPanorama = null;
+let svService = null;
+let svEnabled = false;
+
+function bearingTo(lat1, lon1, lat2, lon2){
+  const toRad = d => d*Math.PI/180, toDeg = r => r*180/Math.PI;
+  const φ1=toRad(lat1), φ2=toRad(lat2), Δλ=toRad(lon2-lon1);
+  const y=Math.sin(Δλ)*Math.cos(φ2);
+  const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+
+function openStreetView(){
+  const overlay = document.getElementById('svOverlay');
+  overlay.style.display = 'block';
+  if (!svService) svService = new google.maps.StreetViewService();
+  if (!svPanorama){
+    svPanorama = new google.maps.StreetViewPanorama(document.getElementById('svPanel'), {
+      pov: { heading: 0, pitch: 0, zoom: 1 },
+      visible: true,
+      motionTracking: false,
+      addressControl: false,
+      linksControl: true,
+      panControl: false,
+      enableCloseButton: false,
+      fullscreenControl: false
+    });
+  }
+  svEnabled = true;
+}
+function closeStreetView(){
+  document.getElementById('svOverlay').style.display = 'none';
+  svEnabled = false;
+}
+document.getElementById('streetBtn').addEventListener('click', openStreetView);
+document.getElementById('svClose').addEventListener('click', closeStreetView);
+
+// Busca el panorama más cercano a mi posición y orienta la vista a la siguiente parada
+function updateStreetViewForPosition(lat, lng){
+  if (!svEnabled || !svService) return;
+  const next = getNextStop();
+  const heading = next ? bearingTo(lat, lng, next.lat, next.lng) : 0;
+
+  const tryFind = (radius) => new Promise((resolve)=>{
+    svService.getPanorama({ location: {lat, lng}, radius }, (data, status) => {
+      resolve(status === 'OK' ? data : null);
+    });
+  });
+
+  (async ()=>{
+    let pano = await tryFind(50);
+    if (!pano) pano = await tryFind(200);
+    if (!pano) pano = await tryFind(500);
+    if (!pano) { console.warn('No hay Street View cercano'); return; }
+
+    svPanorama.setPano(pano.location.pano);
+    svPanorama.setPov({ heading, pitch: 0, zoom: 1 });
+    svPanorama.setPosition(pano.location.latLng);
+    svPanorama.setVisible(true);
+  })();
+}
 </script>
+
+<!-- Google Maps JS (Street View). Reemplaza la API key -->
+<script async src="https://maps.googleapis.com/maps/api/js?key=TU_GOOGLE_MAPS_API_KEY&v=quarterly"></script>
 </body>
 </html>
