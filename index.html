@@ -5,51 +5,573 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Romantic Quest GO</title>
 
-  <!-- Mapbox GL JS v2.15.0 para mejor compatibilidad en iPhone -->
+  <!-- PWA opcional -->
+  <meta name="theme-color" content="#0e0e12">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+
+  <!-- Mapbox GL JS v2.15 (compat iOS) -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 
   <style>
-    body { margin:0; font-family: system-ui, sans-serif; background: #0e0e12; color: #f6f7fb; }
-    #map { height: 50vh; width: 100%; }
+    :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    header{padding:16px 20px calc(16px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
+    h1{margin:0;font-size:18px}
+    #map{height:46vh}
+    .wrap{padding:16px}
+    .card{background:var(--card);border:1px solid #242438;border-radius:14px;padding:14px;margin:12px 0}
+    .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px;font-weight:600;background:#3a3af6;color:white;cursor:pointer}
+    .btn.secondary{background:#2a2a39}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .tag{font-size:12px;padding:4px 8px;border-radius:999px;background:#23233a;color:#cfd3e6}
+    .pill{background:#1b1b28;padding:8px 10px;border-radius:12px}
+    .grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+    .progress{height:8px;background:#242438;border-radius:999px;overflow:hidden}
+    .bar{height:100%;background:linear-gradient(90deg,#3a3af6,#9a66ff);width:0%}
+    .stop{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border-radius:12px;background:#141422}
+    .stop .meta{font-size:12px;color:var(--muted)}
+    .found{opacity:.6}
+    .final{border:2px solid var(--acc)}
+    .footer-note{color:var(--muted);font-size:12px;margin:12px 0 32px}
+    img.card-img{width:100%;border-radius:12px;margin-top:8px}
+    .big{font-size:18px}
+    .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+    /* Overlay cámara + juego */
+    #camOverlay{position:fixed;inset:0;background:#000;display:none;z-index:9999}
+    #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+    #camCanvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+    #camTopBar{
+      position:absolute;top:0;left:0;right:0;display:flex;gap:8px;justify-content:flex-end;
+      padding:10px calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left));
+      background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0))
+    }
+    #closeCam,#throwHintBtn{background:#2a2a39;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:600}
+    #camHint{
+      position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;font-size:14px;
+      background:rgba(0,0,0,.35);padding:8px 12px;border-radius:10px
+    }
+
+    /* avisos */
+    #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;
+      background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
+
+    /* Modal de premio */
+    #rewardModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10001}
+    #rewardModal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+    #rewardModal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
+    #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
+    #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
   </style>
 </head>
 <body>
-  <h1 style="padding: 10px;">Romantic Quest GO ✨</h1>
-  <div id="map"></div>
+<header>
+  <h1>Romantic Quest GO ✨</h1>
+</header>
 
-  <script>
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
+<div id="map"></div>
 
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: [-100.3923, 20.5935],
-      zoom: 13,
-      pitch: 45,
-      bearing: -17.6,
-      antialias: true
+<div class="wrap">
+  <div class="card">
+    <div class="grid">
+      <div>
+        <div class="big">Progreso</div>
+        <div class="footer-note" id="progressText">0 de 0 cartas</div>
+      </div>
+      <div class="flex" style="gap:8px;">
+        <button id="startBtn" class="btn">Iniciar GPS</button>
+        <button id="resetBtn" class="btn secondary" title="Borrar cartas capturadas">Reiniciar</button>
+      </div>
+    </div>
+    <div class="progress" style="margin-top:10px"><div id="bar" class="bar"></div></div>
+  </div>
+
+  <div id="stopsList"></div>
+
+  <div id="finalCard" class="card final" style="display:none;">
+    <div class="flex"><span class="tag">¡Última misión desbloqueada!</span></div>
+    <p id="finalMsg" style="margin:8px 0 0 0;"></p>
+    <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
+  </div>
+
+  <p class="footer-note">
+    Si no ves la cámara o el mapa, abre el sitio con HTTPS (GitHub Pages) y toca un botón antes de pedir permisos.
+  </p>
+</div>
+
+<!-- Overlay de cámara con juego de captura -->
+<div id="camOverlay">
+  <video id="camVideo" autoplay playsinline muted></video>
+  <canvas id="camCanvas"></canvas>
+  <div id="camTopBar">
+    <button id="closeCam">Cerrar</button>
+    <button id="throwHintBtn">¿Cómo lanzar?</button>
+  </div>
+  <div id="camHint">Toca cerca de la bola y desliza hacia la carta para lanzarla ❤️</div>
+</div>
+
+<!-- avisos -->
+<div id="msgBar"></div>
+
+<!-- Modal de premio -->
+<div id="rewardModal">
+  <div class="backdrop"></div>
+  <div class="content">
+    <h3 id="rewardTitle" style="margin:0 0 8px 0;">¡Premio desbloqueado!</h3>
+    <p id="rewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
+    <img id="rewardImg" alt="Premio">
+    <div class="row">
+      <a id="rewardUseBtn" class="btn" target="_blank" rel="noopener">Usar cupón</a>
+      <button id="rewardCloseBtn" class="btn secondary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= CONFIG ========= */
+// Tu token de Mapbox:
+mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
+
+// Paradas y juego
+const STOPS = [
+  { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
+    title:"Nuestra primera charla ☕",
+    message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
+    camImg:"models/carta1.png" },
+  { id:"parque", lat: 20.6008, lng: -100.3890, radius: 50000,
+    title:"El parque de las risas 🌳",
+    message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
+    camImg:"models/carta2.png" },
+  { id:"cine", lat: 20.5871, lng: -100.3899, radius: 50000,
+    title:"Butacas cómplices 🎬",
+    message:"La película fue buena, pero tu mano en la mía fue mejor.",
+    camImg:"models/carta3.png" }
+];
+
+const FINAL_DESTINATION = {
+  lat: 20.5899, lng: -100.3881,
+  text: "Has reunido todas las cartas. Hay una última sorpresa esperando por ti… ¿Vienes? 💛",
+  linkText: "Navegar al destino final",
+};
+
+const REWARDS = {
+  cafe:   { title:"Cupón de café ☕", text:"¡Ganaste un cafecito a mi cuenta!", img:"models/cupon_cafe.png", url:"#cafe" },
+  parque: { title:"Cupón picnic 🌳", text:"Picnic bajo los árboles, yo invito.", img:"models/cupon_picnic.png", url:"#picnic" },
+  cine:   { title:"Cupón cine 🎬", text:"Noche de película y palomitas.", img:"models/cupon_cine.png", url:"#cine" }
+};
+
+const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFreq: 2.2 };
+const STORAGE_KEY = "rqg_progress_v1";
+let found = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+
+/* ========= UTILIDADES ========= */
+function showMsg(text, ms=3200){
+  const bar = document.getElementById('msgBar');
+  bar.textContent = text; bar.style.display = 'block';
+  clearTimeout(showMsg._t); showMsg._t = setTimeout(()=> bar.style.display='none', ms);
+}
+function fmtMeters(m){ if (m==null) return ""; if (m<1000) return `${Math.round(m)} m`; const km=m/1000; return km>=10?`${Math.round(km)} km`:`${km.toFixed(1)} km`; }
+function haversine(lat1, lon1, lat2, lon2) {
+  const R=6371000, toRad=x=>x*Math.PI/180, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function rand(min,max){ return Math.random()*(max-min)+min; }
+
+/* ========= MAPA 3D (Mapbox GL v2.15) ========= */
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v11', // puedes probar 'satellite-streets-v11'
+  center: [-100.389, 20.595],
+  zoom: 13,
+  pitch: 60,
+  bearing: -20,
+  antialias: true
+});
+
+// Logger de errores (útil en iPhone)
+map.on('error', (e) => {
+  console.error('[Mapbox ERROR]', e && e.error);
+  if (e?.error?.message) alert('Mapbox: ' + e.error.message);
+});
+
+map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+map.on('style.load', () => {
+  // Terreno (DEM)
+  map.addSource('mapbox-dem', { type:'raster-dem', url:'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize:512, maxzoom:14 });
+  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
+
+  // Cielo
+  map.addLayer({ id:'sky', type:'sky', paint:{ 'sky-type':'atmosphere', 'sky-atmosphere-sun':[0,0], 'sky-atmosphere-sun-intensity':12 } });
+
+  // Edificios 3D
+  const labelLayerId = (map.getStyle().layers||[]).find(l=>l.type==='symbol')?.id;
+  map.addLayer({
+    id:'3d-buildings',
+    source:'composite',
+    'source-layer':'building',
+    filter:['==',['get','extrude'],'true'],
+    type:'fill-extrusion',
+    minzoom:15,
+    paint:{
+      'fill-extrusion-color':'#b1b6c3',
+      'fill-extrusion-height':['get','height'],
+      'fill-extrusion-base':['get','min_height'],
+      'fill-extrusion-opacity':0.6
+    }
+  }, labelLayerId);
+
+  addStopMarkers();
+});
+
+/* Marcadores de paradas */
+const stopMarkers = [];
+function addStopMarkers(){
+  stopMarkers.forEach(m=>m.remove()); stopMarkers.length=0;
+
+  for (const s of STOPS) {
+    const el = document.createElement('div');
+    el.style.width='16px'; el.style.height='16px'; el.style.borderRadius='50%';
+    el.style.border='2px solid #fff'; el.style.background='#3a3af6';
+    const mk = new mapboxgl.Marker(el).setLngLat([s.lng, s.lat])
+      .setPopup(new mapboxgl.Popup({ offset:12 }).setText(s.title)).addTo(map);
+    stopMarkers.push(mk);
+  }
+  // Destino final
+  const elf = document.createElement('div');
+  elf.style.width='18px'; elf.style.height='18px'; elf.style.borderRadius='50%';
+  elf.style.border='2px solid #fff'; elf.style.background='#ffd54d';
+  new mapboxgl.Marker(elf).setLngLat([FINAL_DESTINATION.lng, FINAL_DESTINATION.lat])
+    .setPopup(new mapboxgl.Popup({ offset:12 }).setText('Destino final 💛')).addTo(map);
+}
+
+/* ========= RUTA hacia la siguiente parada ========= */
+let routeSourceAdded = false;
+function drawRoute(geojson){
+  if (!routeSourceAdded){
+    map.addSource('route', { type:'geojson', data: geojson });
+    map.addLayer({
+      id:'route-line', type:'line', source:'route',
+      paint:{ 'line-color':'#ff5a7a','line-width':6,'line-opacity':0.9 }
     });
+    routeSourceAdded = true;
+  } else {
+    map.getSource('route').setData(geojson);
+  }
+}
+function getNextStop(){ for (const s of STOPS) if (!found.has(s.id)) return s; return null; }
 
-    // Logger para errores en Safari iOS
-    map.on('error', (e) => {
-      console.error('[Mapbox ERROR]', e && e.error);
-      alert('Mapbox: ' + (e?.error?.message || 'Error cargando estilo/tiles'));
-    });
+async function fetchAndDrawRoute(fromLngLat, toLngLat){
+  if (!toLngLat) return;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`;
+  try{
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]){
+      const gj = { type:'FeatureCollection', features:[{ type:'Feature', geometry:data.routes[0].geometry, properties:{} }] };
+      drawRoute(gj);
+      const coords = data.routes[0].geometry.coordinates;
+      const bounds = coords.reduce((b,c)=>b.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+      map.fitBounds(bounds, { padding: 60, pitch: map.getPitch(), bearing: map.getBearing(), duration: 800 });
+    }
+  }catch(e){ console.warn('No se pudo obtener la ruta', e); }
+}
 
-    // Ejemplo: puntos de prueba
-    const stops = [
-      { coords: [-100.3923, 20.5935], title: "Parada 1" },
-      { coords: [-100.3890, 20.6008], title: "Parada 2" },
-      { coords: [-100.3899, 20.5871], title: "Parada 3" }
-    ];
+/* ========= UI de paradas ========= */
+const stopsList = document.getElementById('stopsList');
+function renderStops(distanceMap = {}) {
+  stopsList.innerHTML = "";
+  STOPS.forEach(s => {
+    const isFound = found.has(s.id);
+    const d = distanceMap[s.id];
+    const canCatch = d != null && d <= s.radius;
 
-    stops.forEach(stop => {
-      new mapboxgl.Marker()
-        .setLngLat(stop.coords)
-        .setPopup(new mapboxgl.Popup().setText(stop.title))
-        .addTo(map);
-    });
-  </script>
+    const div = document.createElement('div');
+    div.className = "card stop" + (isFound ? " found" : "");
+    const camBtn = canCatch
+      ? `<button class="btn secondary" data-cam="${s.id}">Ver en cámara</button>`
+      : `<button class="btn secondary" disabled title="Acércate para usar cámara">Ver en cámara</button>`;
+
+    div.innerHTML = `
+      <div>
+        <div><strong>${s.title}</strong></div>
+        <div class="meta">Radio: ${s.radius} m · ${d!=null?`Distancia: ${fmtMeters(d)}`:""}</div>
+        <div class="meta">${isFound ? "✅ Carta atrapada" : "Pendiente"}</div>
+        ${isFound ? `<div class="pill">${s.message}</div>` : ""}
+      </div>
+      <div class="btns">
+        ${camBtn}
+        <button data-id="${s.id}" class="btn" ${isFound || !canCatch ? "disabled":""}>
+          Atrapar carta
+        </button>
+      </div>`;
+    stopsList.appendChild(div);
+  });
+
+  const got = found.size, total = STOPS.length;
+  document.getElementById('progressText').textContent = `${got} de ${total} cartas`;
+  document.getElementById('bar').style.width = (total? (100*got/total):0) + "%";
+
+  const showFinal = (found.size === STOPS.length);
+  const finalCard = document.getElementById('finalCard');
+  finalCard.style.display = showFinal ? "block" : "none";
+  if (showFinal) {
+    document.getElementById('finalMsg').textContent = FINAL_DESTINATION.text;
+    const finalUrlApple = `http://maps.apple.com/?daddr=${FINAL_DESTINATION.lat},${FINAL_DESTINATION.lng}&dirflg=d`;
+    const finalUrlGoogle = `https://www.google.com/maps/dir/?api=1&destination=${FINAL_DESTINATION.lat},${FINAL_DESTINATION.lng}`;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const link = document.getElementById('finalLink');
+    link.textContent = FINAL_DESTINATION.linkText;
+    link.href = isIOS ? finalUrlApple : finalUrlGoogle;
+  }
+}
+renderStops();
+
+/* ========= eventos lista ========= */
+stopsList.addEventListener('click', (e)=>{
+  const camBtn = e.target.closest('button[data-cam]');
+  if (camBtn){
+    const stopId = camBtn.getAttribute('data-cam');
+    const stop = STOPS.find(x=>x.id===stopId);
+    if (stop) openCamera(stop);
+    return;
+  }
+  const btn = e.target.closest('button[data-id]');
+  if(!btn) return;
+  const id = btn.getAttribute('data-id');
+  if (found.has(id)) return;
+  found.add(id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
+  btn.textContent = "¡Capturada!";
+  btn.disabled = true;
+  renderStops(lastDistances);
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  localStorage.removeItem(STORAGE_KEY);
+  found = new Set();
+  renderStops(lastDistances);
+  showMsg("Progreso reiniciado. 🎯");
+});
+
+/* ========= GPS + marcador propio + ruta ========= */
+let watchId = null;
+let lastDistances = {};
+let myMarker = null;
+
+function updateDistances(pos){
+  const { latitude:lat, longitude:lng } = pos.coords;
+
+  if (!myMarker){
+    const el = document.createElement('div');
+    el.style.width='14px'; el.style.height='14px'; el.style.borderRadius='50%';
+    el.style.border='2px solid #fff'; el.style.background='#1e88ff';
+    myMarker = new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map);
+    map.easeTo({ center:[lng, lat], zoom:14, duration:600 });
+  } else {
+    myMarker.setLngLat([lng, lat]);
+  }
+
+  const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
+  lastDistances = d; renderStops(d);
+
+  const next = getNextStop(); if (!next) return;
+  const me = [lng, lat], dest = [next.lng, next.lat];
+  clearTimeout(updateDistances._t);
+  updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 400);
+}
+
+function startGPS(){
+  if(!('geolocation' in navigator)){ alert("Tu navegador no permite geolocalización."); return; }
+  if (watchId!=null) return;
+  watchId = navigator.geolocation.watchPosition(updateDistances, (err)=>{
+    console.warn(err); showMsg("No se pudo obtener tu ubicación. Revisa permisos.");
+  }, { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+}
+document.getElementById('startBtn').addEventListener('click', startGPS);
+
+/* ========= CÁMARA + MINI-JUEGO ========= */
+const camOverlay = document.getElementById('camOverlay');
+const camVideo   = document.getElementById('camVideo');
+const camCanvas  = document.getElementById('camCanvas');
+const closeCam   = document.getElementById('closeCam');
+const throwHintBtn = document.getElementById('throwHintBtn');
+
+let camStream = null, currentStop = null;
+let W=0,H=0,DPR=Math.max(1,window.devicePixelRatio||1);
+const ctx = camCanvas.getContext('2d');
+
+const placeholderDataURL =
+  "data:image/svg+xml;charset=utf8," +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="960"><rect width="100%" height="100%" fill="#222"/><text x="50%" y="50%" fill="#fff" font-size="28" text-anchor="middle">Imagen no encontrada</text></svg>');
+
+const game = { card:null, ball:null, gravity:1800, swipe:{active:false,sx:0,sy:0,ex:0,ey:0}, running:false, last:0 };
+
+function loadImage(src){
+  return new Promise((resolve)=>{
+    const im=new Image();
+    im.onload=()=>resolve(im);
+    im.onerror=()=>{
+      console.warn("No se pudo cargar imagen:", src);
+      showMsg("No se encontró la carta: " + src);
+      const ph=new Image(); ph.onload=()=>resolve(ph); ph.src=placeholderDataURL;
+    };
+    im.src=src;
+  });
+}
+function resizeCanvas(){
+  const rect = camVideo.getBoundingClientRect();
+  W=Math.floor(rect.width); H=Math.floor(rect.height||W*1.6);
+  camCanvas.width=Math.floor(W*DPR); camCanvas.height=Math.floor(H*DPR);
+  camCanvas.style.width=W+'px'; camCanvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+
+async function openCamera(stop){
+  currentStop = stop;
+  camOverlay.style.display = "block";
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:"environment"}, audio:false });
+    camVideo.srcObject = camStream; await camVideo.play();
+    camVideo.addEventListener('loadedmetadata', resizeCanvas, { once:true });
+  }catch(err){
+    console.error(err); showMsg("No se pudo acceder a la cámara. Usa HTTPS y permite acceso.");
+    closeCamera(); return;
+  }
+
+  resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+
+  const cardImg = await loadImage(stop.camImg || "models/carta1.png");
+  const cardW = Math.min(W*0.42, 320), cardH = cardW*1.5;
+  const speed = rand(DIFFICULTY.cardSpeedMin, DIFFICULTY.cardSpeedMax);
+  const angle = rand(0, Math.PI*2);
+  game.card = {x:(W-cardW)/2, y:H*0.22, w:cardW, h:cardH, img:cardImg, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed, t:0};
+
+  const r = Math.max(22, W*0.055);
+  game.ball = {x: W*0.5, y: H*0.82, r, vx:0, vy:0, flying:false};
+
+  game.running = true; game.last = 0; requestAnimationFrame(loop);
+  camCanvas.addEventListener('pointerdown', onDown);
+  camCanvas.addEventListener('pointermove', onMove);
+  camCanvas.addEventListener('pointerup',   onUp);
+}
+
+function closeCamera(){
+  game.running=false;
+  camCanvas.removeEventListener('pointerdown', onDown);
+  camCanvas.removeEventListener('pointermove', onMove);
+  camCanvas.removeEventListener('pointerup',   onUp);
+  window.removeEventListener('resize', resizeCanvas);
+  camOverlay.style.display = "none";
+  camVideo.pause();
+  if (camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  currentStop=null;
+}
+
+function onDown(e){
+  const rect = camCanvas.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+  const b=game.ball; if(!b) return;
+  const dx=x-b.x, dy=y-b.y;
+  if(dx*dx+dy*dy <= b.r*b.r*1.8){
+    game.swipe = {active:true,sx:x,sy:y,ex:x,ey:y};
+  }
+}
+function onMove(e){
+  if(!game.swipe.active) return;
+  const rect = camCanvas.getBoundingClientRect();
+  game.swipe.ex = e.clientX-rect.left;
+  game.swipe.ey = e.clientY-rect.top;
+}
+function onUp(){
+  const b=game.ball; if(!game.swipe.active||!b||b.flying){ game.swipe.active=false; return; }
+  const dx=game.swipe.ex-game.swipe.sx, dy=game.swipe.ey-game.swipe.sy;
+  const mag=Math.hypot(dx,dy); if(mag<12){ game.swipe.active=false; return; }
+  const ang=Math.atan2(dy,dx), speed=Math.min(1,mag/220)*1500;
+  b.vx=Math.cos(ang)*speed; b.vy=Math.sin(ang)*speed; b.flying=true; game.swipe.active=false;
+}
+
+function loop(ts){
+  if(!game.running) return;
+  if(!game.last) game.last = ts;
+  const dt = Math.min(0.033, (ts-game.last)/1000); game.last = ts;
+  const b=game.ball, t=game.card;
+
+  // Carta en movimiento + rebotes + “wobble”
+  if(t){
+    t.t += dt; t.x += t.vx*dt; t.y += t.vy*dt;
+    const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
+    if(t.x<6){ t.x=6; t.vx*=-1; } if(t.x+t.w>W-6){ t.x=W-6-t.w; t.vx*=-1; }
+    if(t.y<6){ t.y=6; t.vy*=-1; } if(t.y+t.h>H*0.9){ t.y=H*0.9-t.h; t.vy*=-1; }
+
+    ctx.clearRect(0,0,W,H);
+    ctx.drawImage(t.img, t.x, t.y+wobble, t.w, t.h);
+  } else {
+    ctx.clearRect(0,0,W,H);
+  }
+
+  // Bola con física simple
+  if(b){
+    if(b.flying){ b.vy += game.gravity*dt; b.x += b.vx*dt; b.y += b.vy*dt; }
+    if(b.x<b.r){ b.x=b.r; b.vx*=-0.4; }
+    if(b.x>W-b.r){ b.x=W-b.r; b.vx*=-0.4; }
+    if(b.y>H-b.r){ b.y=H-b.r; b.vy*=-0.35; b.vx*=0.96; if(Math.abs(b.vy)<60){ b.vy=0; b.flying=false; } }
+
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fillStyle="#ff5a7a"; ctx.fill();
+    ctx.save(); ctx.translate(b.x,b.y-2); ctx.fillStyle="#fff"; heartPath(ctx,b.r*0.38); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.22,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fill();
+  }
+
+  // Línea guía de swipe
+  if(game.swipe.active){
+    ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(game.swipe.sx,game.swipe.sy); ctx.lineTo(game.swipe.ex,game.swipe.ey); ctx.stroke();
+  }
+
+  // Colisión bola vs carta
+  if(b && t && b.x>t.x && b.x<t.x+t.w && b.y>t.y && b.y<t.y+t.h){ onCaught(); return; }
+
+  requestAnimationFrame(loop);
+}
+
+function heartPath(ctx, s){
+  ctx.beginPath();
+  ctx.moveTo(0, s*0.6);
+  ctx.bezierCurveTo(-s, -s*0.2, -s*0.9, -s, 0, -s*0.6);
+  ctx.bezierCurveTo(s*0.9, -s, s, -s*0.2, 0, s*0.6);
+}
+
+function onCaught(){
+  if(currentStop && !found.has(currentStop.id)){
+    found.add(currentStop.id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
+  }
+  setTimeout(()=>{ closeCamera(); renderStops(lastDistances); showReward(currentStop?.id); }, 120);
+}
+
+const rewardModal = document.getElementById('rewardModal');
+const rewardTitle = document.getElementById('rewardTitle');
+const rewardText  = document.getElementById('rewardText');
+const rewardImg   = document.getElementById('rewardImg');
+const rewardUseBtn= document.getElementById('rewardUseBtn');
+const rewardCloseBtn = document.getElementById('rewardCloseBtn');
+function showReward(id){
+  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#premio" };
+  rewardTitle.textContent = r.title; rewardText.textContent  = r.text;
+  rewardImg.src = r.img; rewardUseBtn.href = r.url; rewardModal.style.display = 'flex';
+}
+rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
+rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
+
+closeCam.addEventListener('click', closeCamera);
+throwHintBtn.addEventListener('click', ()=>showMsg("Toca cerca de la bola y desliza hacia la carta. Más largo/recto = más velocidad.", 4200));
+</script>
 </body>
 </html>
