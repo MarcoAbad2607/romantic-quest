@@ -541,7 +541,7 @@ async function openCamera(stop){
 function closeCamera(){
   game.running=false;
   camCanvas.removeEventListener('pointerdown', onDown);
-  camCanvas.removeEventListener('pointermove', on Move);
+  camCanvas.removeEventListener('pointermove', onMove);
   camCanvas.removeEventListener('pointerup',   onUp);
   window.removeEventListener('resize', resizeCanvas);
   camOverlay.style.display = "none";
