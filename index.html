@@ -1,330 +1,252 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Romantic Quest GO – AR</title>
-<style>
-  html,body{margin:0;height:100%;background:#0b0b10;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  header{padding:12px 16px;border-bottom:1px solid #1e1e2a;background:#0f0f16;position:sticky;top:0;z-index:3}
-  h1{margin:0;font-size:18px}
-  .wrap{padding:12px 16px}
-  .btn{background:#3a3af6;color:#fff;border:0;border-radius:12px;padding:10px 14px;font-weight:600}
-  .btn.secondary{background:#23233a}
-  #videoWrap{position:relative; width:100%; max-width:420px; margin:12px auto; border-radius:16px; overflow:hidden; background:#000}
-  video{width:100%; height:auto; display:block; transform:scaleX(-1);} /* espejo para estilo AR */
-  canvas{position:absolute; left:0; top:0; width:100%; height:100%; touch-action:none;}
-  .card{background:#151527;border:1px solid #252545;border-radius:14px;padding:12px;margin:12px 0}
-  .tag{font-size:12px;background:#23233a;color:#cfd3e6;padding:4px 8px;border-radius:999px}
-  .row{display:flex; gap:8px; flex-wrap:wrap}
-  .progress{height:8px;background:#23233a;border-radius:999px;overflow:hidden}
-  .bar{height:100%;background:linear-gradient(90deg,#3a3af6,#9a66ff);width:0%}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Romantic Quest GO</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+  <style>
+    :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    header{padding:16px 20px;border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
+    h1{margin:0;font-size:18px}
+    #map{height:46vh}
+    .wrap{padding:16px}
+    .card{background:var(--card);border:1px solid #242438;border-radius:14px;padding:14px;margin:12px 0}
+    .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px;font-weight:600;background:#3a3af6;color:white;cursor:pointer}
+    .btn.secondary{background:#2a2a39}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .tag{font-size:12px;padding:4px 8px;border-radius:999px;background:#23233a;color:#cfd3e6}
+    .pill{background:#1b1b28;padding:8px 10px;border-radius:12px}
+    .grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+    .progress{height:8px;background:#242438;border-radius:999px;overflow:hidden}
+    .bar{height:100%;background:linear-gradient(90deg,#3a3af6,#9a66ff);width:0%}
+    .stop{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border-radius:12px;background:#141422}
+    .stop .meta{font-size:12px;color:var(--muted)}
+    .found{opacity:.6}
+    .final{border:2px solid var(--acc)}
+    .footer-note{color:var(--muted);font-size:12px;margin-top:8px}
+    img.card-img{width:100%;border-radius:12px;margin-top:8px}
+    .big{font-size:18px}
+    .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  </style>
 </head>
 <body>
-<header><h1>Romantic Quest GO ✨ – AR Catch</h1></header>
+<header>
+  <h1>Romantic Quest GO ✨</h1>
+</header>
+
+<div id="map"></div>
 
 <div class="wrap">
   <div class="card">
-    <div class="row">
-      <button id="cameraBtn" class="btn">Abrir cámara</button>
-      <button id="spawnBtn" class="btn secondary" disabled>Mostrar carta</button>
-      <button id="throwHintBtn" class="btn secondary" disabled>Cómo lanzar</button>
+    <div class="grid">
+      <div>
+        <div class="big">Progreso</div>
+        <div class="footer-note" id="progressText">0 de 0 cartas</div>
+      </div>
+      <button id="startBtn" class="btn">Iniciar GPS</button>
     </div>
-    <div class="progress"><div id="bar" class="bar"></div></div>
-    <div style="font-size:12px;opacity:.8;margin-top:6px">Permite cámara. Desliza desde abajo a arriba para lanzar la HeartBall ❤️</div>
+    <div class="progress" style="margin-top:10px"><div id="bar" class="bar"></div></div>
   </div>
 
-  <div id="videoWrap">
-    <video id="vid" playsinline muted></video>
-    <canvas id="cv"></canvas>
+  <div id="stopsList"></div>
+
+  <div id="finalCard" class="card final" style="display:none;">
+    <div class="flex"><span class="tag">¡Última misión desbloqueada!</span></div>
+    <p id="finalMsg" style="margin:8px 0 0 0;"></p>
+    <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
   </div>
 
-  <div class="card">
-    <span class="tag">Parada actual</span>
-    <div id="stopTitle" style="margin-top:6px;font-weight:700">Carta: “Nuestra primera charla ☕”</div>
-    <div id="stopMsg" style="opacity:.85;margin-top:6px">Atrápala en AR para desbloquear el mensaje.</div>
-  </div>
-
-  <div id="caughtCard" class="card" style="display:none">
-    <span class="tag">✅ ¡Capturada!</span>
-    <p id="caughtText" style="margin-top:8px"></p>
-  </div>
+  <p class="footer-note">
+    Tip iPhone: usa el enlace HTTPS de GitHub Pages y toca “Iniciar GPS” para permitir ubicación. Para ver el 3D, sube tus archivos USDZ a <code>/models/</code>.
+  </p>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script>
-/* -------- Configurable (puedes rotar varias cartas si quieres) -------- */
-const CARD_DATA = {
-  id: "cafe",
-  title: "Nuestra primera charla ☕",
-  message: "Aquí comenzó todo. Gracias por ese café y por tu risa.",
-};
-/* --------------------------------------------------------------------- */
+/* ========= CONFIGURA TUS PARADAS AQUÍ =========
+  - lat, lng: coordenadas
+  - radius: metros (ahora 50 km para pruebas rápidas)
+  - title: nombre visible
+  - message: el mensaje de la carta
+  - usdz: ruta al modelo 3D para AR Quick Look (iPhone) - opcional
+  - image: imagen opcional mostrada tras capturar
+*/
+const STOPS = [
+  { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
+    title:"Nuestra primera charla ☕",
+    message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
+    usdz:"/models/carta1.usdz",
+    image:"" },
+  { id:"parque", lat: 20.6008, lng: -100.3890, radius: 50000,
+    title:"El parque de las risas 🌳",
+    message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
+    usdz:"/models/carta2.usdz",
+    image:"" },
+  { id:"cine", lat: 20.5871, lng: -100.3899, radius: 50000,
+    title:"Butacas cómplices 🎬",
+    message:"La película fue buena, pero tu mano en la mía fue mejor.",
+    usdz:"/models/carta3.usdz",
+    image:"" }
+];
 
-const vid = document.getElementById('vid');
-const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
-const cameraBtn = document.getElementById('cameraBtn');
-const spawnBtn = document.getElementById('spawnBtn');
-const throwHintBtn = document.getElementById('throwHintBtn');
-const bar = document.getElementById('bar');
-const stopTitle = document.getElementById('stopTitle');
-const stopMsg = document.getElementById('stopMsg');
-const caughtCard = document.getElementById('caughtCard');
-const caughtText = document.getElementById('caughtText');
-
-stopTitle.textContent = `Carta: “${CARD_DATA.title}”`;
-
-let streamStarted = false;
-let W=0,H=0, DPR = Math.max(1, window.devicePixelRatio||1);
-
-/* Estado del juego */
-let game = {
-  target: null, // carta
-  ball: null,   // HeartBall
-  gravity: 1200, // px/s^2
-  caught: false,
-  t0: 0,
-  last: 0,
-  swipe: {active:false,sx:0,sy:0,ex:0,ey:0},
-  sparkles: []
+/* ========= MENSAJE Y UBICACIÓN FINAL ========= */
+const FINAL_DESTINATION = {
+  lat: 20.5899, lng: -100.3881,
+  text: "Has reunido todas las cartas. Hay una última sorpresa esperando por ti… ¿Vienes? 💛",
+  linkText: "Navegar al destino final",
 };
 
-/* HeartBall y Carta */
-function spawnTarget(){
-  // posición al azar en la mitad superior
-  const w = W*0.34, h = w*0.62; // proporción tipo carta
-  const x = Math.random()*(W - w) * 0.9 + W*0.05;
-  const y = H*0.12 + Math.random()*H*0.15;
-  game.target = {x,y,w,h, wobble:0};
-  game.caught = false;
-  caughtCard.style.display = "none";
-  stopMsg.textContent = "Desliza para lanzar la HeartBall ❤️ y atraparla.";
-}
+/* ========= FIN DE CONFIG ========= */
 
-function spawnBall(){
-  const r = Math.max(22, W*0.055);
-  game.ball = {
-    x: W*0.5, y: H*0.85,
-    r,
-    vx: 0, vy: 0,
-    flying: false
-  };
-}
+const STORAGE_KEY = "rqg_progress_v1";
+let found = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
 
-function resize(){
-  const rect = vid.getBoundingClientRect();
-  W = Math.floor(rect.width);
-  H = Math.floor(rect.height || W*1.6);
-  cv.width = Math.floor(W*DPR);
-  cv.height= Math.floor(H*DPR);
-  cv.style.width = W+'px';
-  cv.style.height= H+'px';
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-}
-window.addEventListener('resize', resize);
+// Mapa
+const map = L.map('map', { zoomControl:true });
+const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'});
+tiles.addTo(map);
 
-/* Cámara */
-async function startCamera(){
-  try{
-    const s = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }, audio:false
-    });
-    vid.srcObject = s;
-    await vid.play();
-    streamStarted = true;
-    resize();
-    spawnBtn.disabled = false;
-    throwHintBtn.disabled = false;
-  }catch(e){
-    alert("No se pudo acceder a la cámara. Asegúrate de permitir el acceso y estar en HTTPS.");
+const markers = {};
+function initMapView() {
+  if (STOPS.length) {
+    const group = L.featureGroup();
+    STOPS.forEach(s => group.addLayer(L.marker([s.lat, s.lng]).bindPopup(s.title)));
+    group.addLayer(L.marker([FINAL_DESTINATION.lat, FINAL_DESTINATION.lng]).bindPopup("Destino final 💛"));
+    group.addTo(map);
+    map.fitBounds(group.getBounds().pad(0.25));
+  } else {
+    map.setView([0,0],2);
   }
 }
+initMapView();
 
-cameraBtn.addEventListener('click', startCamera);
-spawnBtn.addEventListener('click', ()=>{ spawnTarget(); spawnBall(); });
-throwHintBtn.addEventListener('click', ()=>{
-  alert("Consejo: toca cerca de la bola y desliza hacia la carta. Mientras más largo y recto el swipe, más rápido va.");
+// UI render
+const stopsList = document.getElementById('stopsList');
+function fmtMeters(m){
+  if (m == null) return "";
+  if (m < 1000) return `${Math.round(m)} m`;
+  const km = m/1000;
+  return km >= 10 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
+}
+function renderStops(distanceMap = {}) {
+  stopsList.innerHTML = "";
+  STOPS.forEach(s => {
+    const isFound = found.has(s.id);
+    const d = distanceMap[s.id];
+    const canCatch = d != null && d <= s.radius;
+
+    const div = document.createElement('div');
+    div.className = "card stop" + (isFound ? " found" : "");
+    const arBtn = (s.usdz && canCatch)
+      ? `<a class="btn secondary" rel="ar" href="${s.usdz}">Ver en AR</a>`
+      : `<button class="btn secondary" disabled title="Acércate para ver en AR">Ver en AR</button>`;
+    div.innerHTML = `
+      <div>
+        <div><strong>${s.title}</strong></div>
+        <div class="meta">Radio: ${s.radius} m · ${d!=null?`Distancia: ${fmtMeters(d)}`:""}</div>
+        <div class="meta">${isFound ? "✅ Carta atrapada" : "Pendiente"}</div>
+        ${isFound && s.image ? `<img class="card-img" src="${s.image}" alt="">` : ""}
+        ${isFound ? `<div class="pill">${s.message}</div>` : ""}
+      </div>
+      <div class="btns">
+        ${arBtn}
+        <button data-id="${s.id}" class="btn" ${isFound || !canCatch ? "disabled":""}>
+          Atrapar carta
+        </button>
+      </div>`;
+    stopsList.appendChild(div);
+  });
+
+  // progreso
+  const got = found.size, total = STOPS.length;
+  document.getElementById('progressText').textContent = `${got} de ${total} cartas`;
+  document.getElementById('bar').style.width = (total? (100*got/total):0) + "%";
+
+  // final
+  const showFinal = (found.size === STOPS.length);
+  const finalCard = document.getElementById('finalCard');
+  finalCard.style.display = showFinal ? "block" : "none";
+  if (showFinal) {
+    document.getElementById('finalMsg').textContent = FINAL_DESTINATION.text;
+    const finalUrlApple = `http://maps.apple.com/?daddr=${FINAL_DESTINATION.lat},${FINAL_DESTINATION.lng}&dirflg=d`;
+    const finalUrlGoogle = `https://www.google.com/maps/dir/?api=1&destination=${FINAL_DESTINATION.lat},${FINAL_DESTINATION.lng}`;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const link = document.getElementById('finalLink');
+    link.textContent = FINAL_DESTINATION.linkText;
+    link.href = isIOS ? finalUrlApple : finalUrlGoogle;
+  }
+}
+renderStops();
+
+// Capturar
+stopsList.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-id]');
+  if(!btn) return;
+  const id = btn.getAttribute('data-id');
+  if (found.has(id)) return;
+  found.add(id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
+  btn.textContent = "¡Capturada!";
+  btn.disabled = true;
+  renderStops(lastDistances);
 });
 
-/* Inputs (toque/arrastre) */
-cv.addEventListener('pointerdown', e=>{
-  if(!game.ball) return;
-  const rect = cv.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
-  const dx = x - game.ball.x, dy = y - game.ball.y;
-  if(dx*dx + dy*dy <= game.ball.r*game.ball.r*1.8){ // tocar cerca
-    game.swipe = {active:true,sx:x,sy:y,ex:x,ey:y};
+// Distancias
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = x => x * Math.PI/180;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
+            Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+let watchId = null;
+let lastDistances = {};
+
+function updateDistances(pos){
+  const { latitude:lat, longitude:lng } = pos.coords;
+  if (!updateDistances._centered) {
+    map.setView([lat,lng], 13);
+    updateDistances._centered = true;
   }
-});
-cv.addEventListener('pointermove', e=>{
-  if(!game.swipe.active) return;
-  const rect = cv.getBoundingClientRect();
-  game.swipe.ex = e.clientX - rect.left;
-  game.swipe.ey = e.clientY - rect.top;
-});
-cv.addEventListener('pointerup', ()=>{
-  if(!game.swipe.active || !game.ball || game.ball.flying) { game.swipe.active=false; return; }
-  const dx = game.swipe.ex - game.swipe.sx;
-  const dy = game.swipe.ey - game.swipe.sy;
-  const mag = Math.hypot(dx,dy);
-  if(mag < 12){ game.swipe.active=false; return; }
-  // lanzar: invertimos Y (arriba negativo en swipe → arriba positivo en vy negativo)
-  const power = Math.min(1.0, mag/220);
-  const ang = Math.atan2(dy, dx);
-  const speed = 1200 * power; // px/s
-  game.ball.vx = Math.cos(ang)*speed;
-  game.ball.vy = Math.sin(ang)*speed;
-  // si fue swipe hacia arriba, la vy será negativa; bien.
-  game.ball.flying = true;
-  game.swipe.active = false;
-});
-
-/* Física + Dibujo */
-function step(ts){
-  if(!game.t0) game.t0 = ts;
-  const dt = Math.min(0.033, (ts - game.last)/1000 || 0);
-  game.last = ts;
-  draw(dt);
-  requestAnimationFrame(step);
-}
-
-function draw(dt){
-  ctx.clearRect(0,0,W,H);
-
-  // Dibujar target (carta)
-  if(game.target){
-    game.target.wobble += dt*3;
-    const bump = Math.sin(game.target.wobble)*4;
-    const {x,y,w,h} = game.target;
-    // carta base
-    roundRect(ctx, x, y + bump, w, h, 14, "#ffd54d", "#28283a");
-    // “arte” de la carta
-    ctx.fillStyle = "#1b1b28";
-    ctx.fillRect(x+10, y+10 + bump, w-20, h*0.55);
-    // título
-    ctx.fillStyle = "#111";
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(x, y + h*0.62 + bump, w, 28);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#fff";
-    ctx.font = "600 14px system-ui,-apple-system,Segoe UI,Roboto";
-    ctx.fillText(CARD_DATA.title, x+12, y + h*0.62 + 19 + bump);
+  if (!markers.me){
+    markers.me = L.circleMarker([lat,lng],{radius:8,weight:2,color:'#3a3af6'}).addTo(map);
+  } else {
+    markers.me.setLatLng([lat,lng]);
   }
+  const d = {};
+  STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
+  lastDistances = d;
+  renderStops(d);
+}
 
-  // Bola
-  if(game.ball){
-    if(game.ball.flying){
-      game.ball.vy += game.gravity*dt;
-      game.ball.x += game.ball.vx*dt;
-      game.ball.y += game.ball.vy*dt;
-    }
-    // rebotes simples laterales
-    if(game.ball.x < game.ball.r){ game.ball.x = game.ball.r; game.ball.vx *= -0.4; }
-    if(game.ball.x > W - game.ball.r){ game.ball.x = W - game.ball.r; game.ball.vx *= -0.4; }
-    // suelo
-    if(game.ball.y > H - game.ball.r){
-      game.ball.y = H - game.ball.r;
-      game.ball.vy *= -0.35;
-      game.ball.vx *= 0.96;
-      if(Math.abs(game.ball.vy) < 60) { game.ball.vy = 0; game.ball.flying=false; }
-    }
-
-    drawBall(ctx, game.ball.x, game.ball.y, game.ball.r);
-
-    // Línea de swipe (si está arrastrando)
-    if(game.swipe.active){
-      ctx.strokeStyle = "rgba(255,255,255,.5)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(game.swipe.sx, game.swipe.sy);
-      ctx.lineTo(game.swipe.ex, game.swipe.ey);
-      ctx.stroke();
-    }
+function startGPS(){
+  if(!('geolocation' in navigator)){
+    alert("Tu navegador no permite geolocalización.");
+    return;
   }
-
-  // Colisión con carta (AABB vs punto del centro de la bola)
-  if(game.ball && game.target && !game.caught){
-    const b = game.ball, t = game.target;
-    if(b.x > t.x && b.x < t.x + t.w && b.y > t.y && b.y < t.y + t.h){
-      game.caught = true;
-      explode(t.x+t.w/2, t.y+t.h/2);
-      onCaught();
-    }
-  }
-
-  // Partículas
-  for(let i=game.sparkles.length-1;i>=0;i--){
-    const s = game.sparkles[i];
-    s.vy += 300*dt;
-    s.x += s.vx*dt; s.y += s.vy*dt;
-    s.life -= dt;
-    if(s.life<=0) { game.sparkles.splice(i,1); continue; }
-    ctx.globalAlpha = Math.max(0, s.life/s.max);
-    ctx.beginPath(); ctx.arc(s.x,s.y, s.r, 0, Math.PI*2); ctx.fillStyle = "#ffd54d"; ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  if (watchId!=null) return;
+  watchId = navigator.geolocation.watchPosition(updateDistances, (err)=>{
+    console.warn(err);
+    alert("No se pudo obtener tu ubicación. Revisa permisos de ubicación.");
+  }, {
+    enableHighAccuracy:true,
+    maximumAge: 5000,
+    timeout: 15000
+  });
 }
 
-function onCaught(){
-  stopMsg.textContent = "¡Carta capturada! 💛";
-  caughtText.textContent = CARD_DATA.message;
-  caughtCard.style.display = "block";
-  // progreso (simbolizamos 1/1 para demo)
-  bar.style.width = "100%";
-  // desaparecer carta después de un momento
-  setTimeout(()=>{ game.target=null; }, 500);
-}
-
-function drawBall(ctx,x,y,r){
-  // esfera base
-  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle="#ff5a7a"; ctx.fill();
-  // corazón
-  ctx.save(); ctx.translate(x,y-2);
-  ctx.fillStyle="#fff";
-  heartPath(ctx, r*0.38); ctx.fill();
-  ctx.restore();
-  // brillo
-  ctx.beginPath(); ctx.arc(x-r*0.35,y-r*0.35, r*0.22,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fill();
-}
-
-function heartPath(ctx, s){
-  ctx.beginPath();
-  ctx.moveTo(0, s*0.6);
-  ctx.bezierCurveTo(-s, -s*0.2, -s*0.9, -s, 0, -s*0.6);
-  ctx.bezierCurveTo(s*0.9, -s, s, -s*0.2, 0, s*0.6);
-}
-
-function roundRect(ctx,x,y,w,h,r,stroke="#fff",fill="#000"){
-  ctx.lineWidth=2;
-  ctx.fillStyle=fill; ctx.strokeStyle=stroke;
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y, x+w,y+h, r);
-  ctx.arcTo(x+w,y+h, x,y+h, r);
-  ctx.arcTo(x,y+h, x,y, r);
-  ctx.arcTo(x,y, x+w,y, r);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-}
-
-function explode(x,y){
-  for(let i=0;i<36;i++){
-    game.sparkles.push({
-      x,y,
-      vx:(Math.random()*2-1)*220,
-      vy:(Math.random()*2-1)*220,
-      r: 2+Math.random()*3,
-      life:.6+Math.random()*.5,
-      max:1.1
-    });
-  }
-}
-
-/* Loop */
-requestAnimationFrame(step);
-
-/* Ajustar canvas cuando el video tenga dimensiones */
-vid.addEventListener('loadedmetadata', resize);
+document.getElementById('startBtn').addEventListener('click', startGPS);
 </script>
 </body>
 </html>
