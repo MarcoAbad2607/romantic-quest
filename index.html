@@ -39,9 +39,13 @@
     .big{font-size:18px}
     .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 
-    /* Puck (marcador de usuario con cono de dirección) */
-    .puck{position:relative;width:20px;height:20px;border-radius:50%;background:#1e88ff;border:2px solid #fff;box-shadow:0 0 0 2px rgba(30,136,255,.25)}
-    .puck:before{content:"";position:absolute;left:50%;top:-14px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid #1e88ff;filter:drop-shadow(0 0 2px rgba(0,0,0,.4))}
+    /* Avatar con “pasitos” */
+    @keyframes avatar-walk-bob { 0%{transform:translateY(0) rotate(var(--rot,0deg))} 50%{transform:translateY(-4px) rotate(var(--rot,0deg))} 100%{transform:translateY(0) rotate(var(--rot,0deg))} }
+    @keyframes avatar-idle-breathe { 0%{transform:scale(1) rotate(var(--rot,0deg))} 50%{transform:scale(1.02) rotate(var(--rot,0deg))} 100%{transform:scale(1) rotate(var(--rot,0deg))} }
+    .avatar-wrap{ width:44px; height:44px; transform:translate(-50%,-50%) }
+    .avatar{ width:44px; height:44px; transform-origin:50% 50%; filter:drop-shadow(0 1px 2px rgba(0,0,0,.35)) }
+    .avatar.walk{ animation:avatar-walk-bob var(--stepDur,480ms) infinite ease-in-out }
+    .avatar.idle{ animation:avatar-idle-breathe 2.6s infinite ease-in-out; opacity:.98 }
 
     /* Overlay cámara + juego */
     #camOverlay{position:fixed;inset:0;background:#000;display:none;z-index:9999}
@@ -69,17 +73,10 @@
     #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
     #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
 
-    /* Fallback de Pantalla Completa (iOS/otros sin Fullscreen API) */
-    body.is-fs header,
-    body.is-fs .wrap{display:none}
-    body.is-fs #map{
-      position:fixed; inset:0; height:100vh !important; width:100vw !important; z-index:9990;
-    }
-    body.is-fs .fs-exit{
-      position:fixed; top:12px; right:12px; z-index:9991;
-      background:#2a2a39; color:#fff; border:0; border-radius:10px; padding:10px 14px; font-weight:600;
-      display:block;
-    }
+    /* Pantalla completa (fallback iOS) */
+    body.is-fs header, body.is-fs .wrap{display:none}
+    body.is-fs #map{ position:fixed; inset:0; height:100vh!important; width:100vw!important; z-index:9990 }
+    body.is-fs .fs-exit{ position:fixed; top:12px; right:12px; z-index:9991; background:#2a2a39; color:#fff; border:0; border-radius:10px; padding:10px 14px; font-weight:600; display:block }
     .fs-exit{display:none}
   </style>
 </head>
@@ -119,7 +116,7 @@
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=7</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=8</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -200,10 +197,10 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* ========= MAPA PLANO estilo navegación ========= */
+/* ========= MAPA (plano navegación) ========= */
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/navigation-day-v1', // plano, sin edificios
+  style: 'mapbox://styles/mapbox/navigation-day-v1',
   center: [-100.389, 20.595],
   zoom: 15.5,
   pitch: 60,
@@ -336,13 +333,28 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   showMsg("Progreso reiniciado. 🎯");
 });
 
-/* ========= GPS + ruta + MODO CAMINATA ========= */
+/* ========= GPS + ruta + MODO CAMINATA + AVATAR ========= */
 let watchId = null;
 let lastDistances = {};
 let myMarker = null;
 let walkingMode = false;
 let lastPos = null;
 let headingFromCompass = null;
+
+// Animación/rotación del avatar según velocidad y rumbo
+function applyAvatarMotion(speedMps, bearingDeg){
+  const img = myMarker?.getElement().querySelector('.avatar');
+  if (!img) return;
+  if (typeof bearingDeg === 'number') img.style.setProperty('--rot', `${bearingDeg}deg`);
+  if (speedMps > 0.6) {
+    img.classList.add('walk'); img.classList.remove('idle');
+    const step = Math.max(260, Math.min(700, 1200/(speedMps + 0.5)));
+    img.style.setProperty('--stepDur', `${Math.round(step)}ms`);
+  } else {
+    img.classList.add('idle'); img.classList.remove('walk');
+    img.style.removeProperty('--stepDur');
+  }
+}
 
 document.getElementById('walkBtn').addEventListener('click', async ()=>{
   walkingMode = !walkingMode;
@@ -365,18 +377,31 @@ window.addEventListener('deviceorientation', (e)=>{
 
 function updateDistances(pos){
   const { latitude:lat, longitude:lng } = pos.coords;
+  const nowTs = (typeof pos.timestamp==='number') ? pos.timestamp : Date.now();
 
+  // Crear/actualizar avatar marker
   if (!myMarker){
-    const el = document.createElement('div'); el.className='puck';
-    myMarker = new mapboxgl.Marker(el, { rotationAlignment: 'map' }).setLngLat([lng, lat]).addTo(map);
+    const wrap = document.createElement('div');
+    wrap.className = 'avatar-wrap';
+    const img = document.createElement('img');
+    img.src = 'models/avatar.png';
+    img.alt = 'Yo';
+    img.className = 'avatar idle';
+    wrap.appendChild(img);
+
+    myMarker = new mapboxgl.Marker(wrap, { anchor: 'center', rotationAlignment: 'map' })
+      .setLngLat([lng, lat]).addTo(map);
+
     map.easeTo({ center:[lng, lat], zoom:16, duration:600 });
   } else {
     myMarker.setLngLat([lng, lat]);
   }
 
+  // Distancias + UI
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d; renderStops(d);
 
+  // Ruta hacia la siguiente parada
   const next = getNextStop();
   if (next){
     const me = [lng, lat], dest = [next.lng, next.lat];
@@ -384,35 +409,44 @@ function updateDistances(pos){
     updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
   }
 
-  if (walkingMode){
-    let bearing = headingFromCompass;
-    if (bearing == null && lastPos){
-      const dy = lat - lastPos.lat, dx = lng - lastPos.lng;
-      if (Math.abs(dx)+Math.abs(dy) > 1e-7) bearing = (Math.atan2(dx, dy) * 180/Math.PI + 360) % 360;
-    }
-    if (bearing == null && next){
-      const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
-      const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
-      const y=Math.sin(Δλ)*Math.cos(φ2);
-      const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-      bearing = (toDeg(Math.atan2(y,x))+360)%360;
-    }
+  // Rumbo: brújula > movimiento > hacia siguiente parada
+  let bearing = headingFromCompass;
+  if (bearing == null && lastPos){
+    const dy = lat - lastPos.lat, dx = lng - lastPos.lng;
+    if (Math.abs(dx)+Math.abs(dy) > 1e-7)
+      bearing = (Math.atan2(dx, dy) * 180/Math.PI + 360) % 360;
+  }
+  if (bearing == null && next){
+    const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
+    const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
+    const y=Math.sin(Δλ)*Math.cos(φ2);
+    const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+    bearing = (toDeg(Math.atan2(y,x))+360)%360;
+  }
 
+  // Velocidad (m/s)
+  let speed = 0;
+  if (lastPos?.ts) {
+    const dt = Math.max(0.2, (nowTs - lastPos.ts)/1000);
+    const dist = haversine(lat, lng, lastPos.lat, lastPos.lng);
+    speed = dist / dt;
+  }
+
+  // Aplica animación + rotación al avatar
+  applyAvatarMotion(speed, bearing);
+
+  // Cámara “caminando”
+  if (walkingMode){
     map.easeTo({
       center: [lng, lat],
-      zoom: 18.3,   // más cerca “tipo Pokémon”
-      pitch: 55,    // inclinación sin edificios
+      zoom: 18.3,
+      pitch: 55,
       bearing: (typeof bearing === 'number') ? bearing : map.getBearing(),
       duration: 600
     });
-
-    try {
-      const el = myMarker.getElement();
-      el.style.transform = `rotate(${(bearing||0)}deg)`;
-    } catch(_){}
   }
 
-  lastPos = { lat, lng };
+  lastPos = { lat, lng, ts: nowTs };
 }
 
 function startGPS(){
@@ -452,23 +486,15 @@ function exitCssFullscreen(){
 }
 
 fsBtn.addEventListener('click', ()=>{
-  // Intenta nativo; si no, usa fallback CSS
   const ok = enterNativeFullscreen();
   if (!ok) enterCssFullscreen();
 });
 fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
-
-// Si cambia el estado nativo, ajusta el mapa y oculta/activa fallback
 ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
   document.addEventListener(ev, ()=>{
     const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-    if (inFs){
-      fsExitBtn.style.display = 'none'; // usando nativo, no fallback
-      map.resize();
-    } else {
-      // Si salimos del nativo, aseguramos que también esté fuera del fallback
-      exitCssFullscreen();
-    }
+    if (inFs){ fsExitBtn.style.display = 'none'; map.resize(); }
+    else { exitCssFullscreen(); }
   });
 });
 
@@ -582,8 +608,9 @@ function loop(ts){
     const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
     if(t.x<6){ t.x=6; t.vx*=-1; } if(t.x+t.w>W-6){ t.x=W-6-t.w; t.vx*=-1; }
     if(t.y<6){ t.y=6; t.vy*=-1; } if(t.y+t.h>H*0.9){ t.y=H*0.9-t.h; t.vy*=-1; }
+    const drawY = t.y + wobble; // movimiento “difícil”
     ctx.clearRect(0,0,W,H);
-    ctx.drawImage(t.img, t.x, t.y+wobble, t.w, t.h);
+    ctx.drawImage(t.img, t.x, drawY, t.w, t.h);
   } else { ctx.clearRect(0,0,W,H); }
 
   if(b){
