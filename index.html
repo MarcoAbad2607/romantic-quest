@@ -82,8 +82,8 @@
       </div>
       <div class="flex">
         <button id="startBtn" class="btn">Iniciar GPS</button>
-        <button id="walkBtn" class="btn secondary" title="Vista inmersiva tipo Street View">Modo caminata</button>
-        <button id="resetBtn" class="btn secondary" title="Borrar cartas capturadas">Reiniciar</button>
+        <button id="walkBtn" class="btn secondary" title="Vista tipo caminar">Modo caminata</button>
+        <button id="resetBtn" class="btn secondary" title="Borrar cartas">Reiniciar</button>
       </div>
     </div>
     <div class="progress" style="margin-top:10px"><div id="bar" class="bar"></div></div>
@@ -98,7 +98,7 @@
   </div>
 
   <p class="footer-note">
-    Consejos iPhone: usa HTTPS (GitHub Pages), permite ubicación y movimiento. Si el mapa se viera plano, sube el zoom con Modo caminata.
+    Si algo no carga, recarga con <code>?v=6</code> al final de la URL (evita caché).
   </p>
 </div>
 
@@ -130,9 +130,14 @@
   </div>
 </div>
 
+<!-- Diagnóstico global: muestra cualquier error JS en un alert (útil en iPhone) -->
+<script>
+  window.onerror = (m, s, l, c, e)=>{ alert("JS error: " + m); console.error(m, s, l, c, e); };
+</script>
+
 <script>
 /* ========= CONFIG ========= */
-// Tu token de Mapbox:
+// Token Mapbox (tuyo):
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 // Paradas y juego
@@ -181,19 +186,24 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* ========= MAPA 3D ========= */
+/* ========= MAPA (streets-v11 para test estable) ========= */
+console.log('Mapbox soportado?', mapboxgl.supported());
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/satellite-streets-v11', // vista “videojuego”
+  style: 'mapbox://styles/mapbox/streets-v11', // luego puedes volver a 'satellite-streets-v11'
   center: [-100.389, 20.595],
-  zoom: 15.5,
-  pitch: 70,
+  zoom: 13,
+  pitch: 60,
   bearing: -20,
   antialias: true
 });
+map.on('load', ()=> console.log('Mapa cargado'));
+map.on('error', (e)=> { console.error('[Mapbox ERROR]', e?.error); alert('Mapbox error: ' + (e?.error?.message || 'desconocido')); });
+
 map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
 map.on('style.load', () => {
+  // Terreno, cielo y edificios 3D (si el estilo los soporta)
   map.addSource('mapbox-dem', { type:'raster-dem', url:'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize:512, maxzoom:14 });
   map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
   map.addLayer({ id:'sky', type:'sky', paint:{ 'sky-type':'atmosphere', 'sky-atmosphere-sun':[0,0], 'sky-atmosphere-sun-intensity':12 } });
@@ -218,15 +228,15 @@ map.on('style.load', () => {
 });
 
 /* Marcadores de paradas */
-const stopMarkers = [];
 function addStopMarkers(){
-  stopMarkers.forEach(m=>m.remove()); stopMarkers.length=0;
-  for (const s of STOPS) {
+  STOPS.forEach(s => {
     const el = document.createElement('div');
     el.style.width='16px'; el.style.height='16px'; el.style.borderRadius='50%';
     el.style.border='2px solid #fff'; el.style.background='#3a3af6';
-    new mapboxgl.Marker(el).setLngLat([s.lng, s.lat]).setPopup(new mapboxgl.Popup({ offset:12 }).setText(s.title)).addTo(map);
-  }
+    new mapboxgl.Marker(el).setLngLat([s.lng, s.lat])
+      .setPopup(new mapboxgl.Popup({ offset:12 }).setText(s.title)).addTo(map);
+  });
+  // Destino final
   const elf = document.createElement('div');
   elf.style.width='18px'; elf.style.height='18px'; elf.style.borderRadius='50%';
   elf.style.border='2px solid #fff'; elf.style.background='#ffd54d';
@@ -342,54 +352,43 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
 let watchId = null;
 let lastDistances = {};
 let myMarker = null;
-let walkingMode = false;      // activo/inactivo
-let lastPos = null;           // última posición para rumbo por movimiento
-let headingFromCompass = null;// grados desde sensor (si disponible)
+let walkingMode = false;
+let lastPos = null;
+let headingFromCompass = null;
 
-// Botón Modo caminata (incluye petición de permiso de movimiento en iOS)
 document.getElementById('walkBtn').addEventListener('click', async ()=>{
   walkingMode = !walkingMode;
   const btn = document.getElementById('walkBtn');
   btn.textContent = walkingMode ? 'Modo caminata: ON' : 'Modo caminata';
-
-  // Pide permiso para DeviceOrientation en iOS
   try{
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       const res = await DeviceOrientationEvent.requestPermission();
-      if (res !== 'granted') showMsg("Sin permiso de brújula. Usaré tu dirección de movimiento.");
+      if (res !== 'granted') showMsg("Sin permiso de brújula. Usaré dirección de movimiento.");
     }
-  }catch(_){ /* ignore */ }
+  }catch(_){}
 });
 
-// Lee brújula (si el navegador la expone)
 window.addEventListener('deviceorientation', (e)=>{
-  // e.webkitCompassHeading en iOS Safari; en otros puede ser alpha
   const ios = (typeof e.webkitCompassHeading === 'number') ? e.webkitCompassHeading : null;
-  if (ios != null) {
-    headingFromCompass = ios; // 0=Norte (grados)
-  } else if (e.absolute === true && typeof e.alpha === 'number') {
-    // e.alpha: rotación alrededor del eje Z (no siempre es norte real)
-    headingFromCompass = 360 - e.alpha; // aproximación
-  }
+  if (ios != null) headingFromCompass = ios;
+  else if (e.absolute === true && typeof e.alpha === 'number') headingFromCompass = 360 - e.alpha;
 }, { passive:true });
 
 function updateDistances(pos){
   const { latitude:lat, longitude:lng } = pos.coords;
 
-  // Puck propio
   if (!myMarker){
     const el = document.createElement('div'); el.className='puck';
     myMarker = new mapboxgl.Marker(el, { rotationAlignment: 'map' }).setLngLat([lng, lat]).addTo(map);
+    map.easeTo({ center:[lng, lat], zoom:14, duration:600 });
   } else {
     myMarker.setLngLat([lng, lat]);
   }
 
-  // Distancias + UI
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d; renderStops(d);
 
-  // Ruta hacia la siguiente parada
   const next = getNextStop();
   if (next){
     const me = [lng, lat], dest = [next.lng, next.lat];
@@ -397,18 +396,20 @@ function updateDistances(pos){
     updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
   }
 
-  // ===== Modo caminata: seguir y orientar cámara =====
   if (walkingMode){
-    // Rumbo preferente: brújula; si no hay, calcula por desplazamiento
     let bearing = headingFromCompass;
     if (bearing == null && lastPos){
       const dy = lat - lastPos.lat, dx = lng - lastPos.lng;
-      if (Math.abs(dx)+Math.abs(dy) > 1e-7) {
-        bearing = (Math.atan2(dx, dy) * 180/Math.PI + 360) % 360; // Norte=0
-      }
+      if (Math.abs(dx)+Math.abs(dy) > 1e-7) bearing = (Math.atan2(dx, dy) * 180/Math.PI + 360) % 360;
     }
-    // Si tampoco hay, apunta hacia la siguiente parada
     if (bearing == null && next){
+      const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
+      const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
+      const y=Math.sin(Δλ)*Math.cos(φ2);
+      const x=Math.cos(φ1)*sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ); // <-- corregimos debajo
+    }
+    // corrección: calculamos bearing hacia next si falta
+    if (walkingMode && bearing == null && next){
       const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
       const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
       const y=Math.sin(Δλ)*Math.cos(φ2);
@@ -416,7 +417,6 @@ function updateDistances(pos){
       bearing = (toDeg(Math.atan2(y,x))+360)%360;
     }
 
-    // Ajusta la cámara “ras de suelo”
     map.easeTo({
       center: [lng, lat],
       zoom: 18.2,
@@ -425,7 +425,6 @@ function updateDistances(pos){
       duration: 600
     });
 
-    // rota visualmente el puck (cono) para apuntar donde miras
     try {
       const el = myMarker.getElement();
       el.style.transform = `rotate(${(bearing||0)}deg)`;
@@ -605,15 +604,6 @@ function showReward(id){
 }
 rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
 rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
-
-const camOverlay = document.getElementById('camOverlay');
-const camVideo   = document.getElementById('camVideo');
-const camCanvas  = document.getElementById('camCanvas');
-const closeCam   = document.getElementById('closeCam');
-const throwHintBtn = document.getElementById('throwHintBtn');
-
-async function openCamera(stop){ /* (idéntico a arriba) ya implementado */ }
-function closeCamera(){ /* (idéntico a arriba) ya implementado */ }
 </script>
 </body>
 </html>
