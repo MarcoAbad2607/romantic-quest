@@ -101,7 +101,7 @@
   </div>
 
   <p class="footer-note">
-    Si no ves la cámara, abre el sitio con HTTPS (GitHub Pages) y toca un botón antes de pedir permisos.
+    Si no ves la cámara o el mapa, abre el sitio con HTTPS (GitHub Pages) y toca un botón antes de pedir permisos.
   </p>
 </div>
 
@@ -135,16 +135,12 @@
 
 <script>
 /* ========= CONFIG =========
-  1) Pega tu token de Mapbox:
+  Token Mapbox (el tuyo):
 */
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 /*
-  2) Paradas y juego:
-  - radius: 50 km para pruebas
-  - camImg: PNG/JPG que aparece sobre la cámara (colócalas en /models/)
-  - REWARDS: mensaje/imagen/enlace por parada cuando capturas
-  - DIFICULTAD: velocidad/movimiento de la carta
+  Paradas y juego:
 */
 const STOPS = [
   { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
@@ -174,8 +170,6 @@ const REWARDS = {
 };
 
 const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFreq: 2.2 };
-/* ========= FIN CONFIG ========= */
-
 const STORAGE_KEY = "rqg_progress_v1";
 let found = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
 
@@ -240,12 +234,12 @@ map.on('style.load', () => {
   addStopMarkers();
 });
 
+/* Marcadores de paradas */
 const stopMarkers = [];
 function addStopMarkers(){
   stopMarkers.forEach(m => m.remove());
   stopMarkers.length = 0;
 
-  // Paradas
   for (const s of STOPS) {
     const el = document.createElement('div');
     el.style.width='16px'; el.style.height='16px'; el.style.borderRadius='50%';
@@ -532,7 +526,7 @@ function onMove(e){
   if(!game.swipe.active) return;
   const rect = camCanvas.getBoundingClientRect();
   game.swipe.ex = e.clientX-rect.left;
-  game.swipe.ey = e.clientY-rect-top;
+  game.swipe.ey = e.clientY-rect.top; /* <- corregido */
 }
 function onUp(){
   const b=game.ball; if(!game.swipe.active||!b||b.flying){ game.swipe.active=false; return; }
