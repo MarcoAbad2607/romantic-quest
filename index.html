@@ -4,14 +4,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Romantic Quest GO</title>
+
+  <!-- PWA -->
+  <meta name="theme-color" content="#0e0e12">
+  <link rel="manifest" href="manifest.webmanifest">
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+
   <style>
     :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--ink)}
-    header{padding:16px 20px;border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
+    header{padding:16px 20px calc(16px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
     h1{margin:0;font-size:18px}
     #map{height:46vh}
     .wrap{padding:16px}
@@ -29,10 +39,29 @@
     .stop .meta{font-size:12px;color:var(--muted)}
     .found{opacity:.6}
     .final{border:2px solid var(--acc)}
-    .footer-note{color:var(--muted);font-size:12px;margin-top:8px}
+    .footer-note{color:var(--muted);font-size:12px;margin:12px 0 32px}
     img.card-img{width:100%;border-radius:12px;margin-top:8px}
     .big{font-size:18px}
     .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+    /* Overlay cámara + juego */
+    #camOverlay{position:fixed;inset:0;background:#000;display:none;z-index:9999}
+    #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+    #camCanvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+    #camTopBar{
+      position:absolute;top:0;left:0;right:0;display:flex;gap:8px;justify-content:flex-end;
+      padding:10px calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left));
+      background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0))
+    }
+    #closeCam,#throwHintBtn{background:#2a2a39;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:600}
+    #camHint{
+      position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;font-size:14px;
+      background:rgba(0,0,0,.35);padding:8px 12px;border-radius:10px
+    }
+
+    /* mini banner iOS "Añadir a inicio" */
+    #iosA2HS{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));background:#1b1b28;color:#fff;border:1px solid #2a2a3a;border-radius:14px;padding:12px;display:none;z-index:3}
+    #iosA2HS .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
   </style>
 </head>
 <body>
@@ -49,7 +78,11 @@
         <div class="big">Progreso</div>
         <div class="footer-note" id="progressText">0 de 0 cartas</div>
       </div>
-      <button id="startBtn" class="btn">Iniciar GPS</button>
+      <div class="flex" style="gap:8px;">
+        <button id="startBtn" class="btn">Iniciar GPS</button>
+        <button id="resetBtn" class="btn secondary" title="Borrar cartas capturadas">Reiniciar</button>
+        <button id="installBtn" class="btn secondary" style="display:none;">Instalar app</button>
+      </div>
     </div>
     <div class="progress" style="margin-top:10px"><div id="bar" class="bar"></div></div>
   </div>
@@ -63,47 +96,57 @@
   </div>
 
   <p class="footer-note">
-    Tip iPhone: usa el enlace HTTPS de GitHub Pages y toca “Iniciar GPS” para permitir ubicación. Para ver el 3D, sube tus archivos USDZ a <code>/models/</code>.
+    Si quieres instalarla como app: en iPhone toca <strong>Compartir</strong> → <strong>Añadir a pantalla de inicio</strong>.
   </p>
+</div>
+
+<!-- Overlay de cámara con juego de captura -->
+<div id="camOverlay">
+  <video id="camVideo" autoplay playsinline muted></video>
+  <canvas id="camCanvas"></canvas>
+  <div id="camTopBar">
+    <button id="closeCam">Cerrar</button>
+    <button id="throwHintBtn">¿Cómo lanzar?</button>
+  </div>
+  <div id="camHint">Toca cerca de la bola y desliza hacia la carta para lanzarla ❤️</div>
+</div>
+
+<!-- iOS “Add to Home Screen” helper -->
+<div id="iosA2HS">
+  <div class="row">
+    <div>Para instalar: toca <strong>Compartir</strong> → <strong>Añadir a pantalla de inicio</strong>.</div>
+    <button id="iosA2HSClose" class="btn secondary">Ok</button>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script>
-/* ========= CONFIGURA TUS PARADAS AQUÍ =========
-  - lat, lng: coordenadas
-  - radius: metros (ahora 50 km para pruebas rápidas)
-  - title: nombre visible
-  - message: el mensaje de la carta
-  - usdz: ruta al modelo 3D para AR Quick Look (iPhone) - opcional
-  - image: imagen opcional mostrada tras capturar
+/* ========= CONFIG =========
+  - radius: 50 km para pruebas
+  - camImg: PNG/JPG que “aparece” sobre la cámara (colócalas en /models/)
 */
 const STOPS = [
   { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
     title:"Nuestra primera charla ☕",
     message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
-    usdz:"/models/carta1.usdz",
-    image:"" },
+    camImg:"models/carta1.png" },
   { id:"parque", lat: 20.6008, lng: -100.3890, radius: 50000,
     title:"El parque de las risas 🌳",
     message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
-    usdz:"/models/carta2.usdz",
-    image:"" },
+    camImg:"models/carta2.png" },
   { id:"cine", lat: 20.5871, lng: -100.3899, radius: 50000,
     title:"Butacas cómplices 🎬",
     message:"La película fue buena, pero tu mano en la mía fue mejor.",
-    usdz:"/models/carta3.usdz",
-    image:"" }
+    camImg:"models/carta3.png" }
 ];
 
-/* ========= MENSAJE Y UBICACIÓN FINAL ========= */
 const FINAL_DESTINATION = {
   lat: 20.5899, lng: -100.3881,
   text: "Has reunido todas las cartas. Hay una última sorpresa esperando por ti… ¿Vienes? 💛",
   linkText: "Navegar al destino final",
 };
-
-/* ========= FIN DE CONFIG ========= */
+/* ========= FIN CONFIG ========= */
 
 const STORAGE_KEY = "rqg_progress_v1";
 let found = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
@@ -127,7 +170,7 @@ function initMapView() {
 }
 initMapView();
 
-// UI render
+// UI
 const stopsList = document.getElementById('stopsList');
 function fmtMeters(m){
   if (m == null) return "";
@@ -144,19 +187,19 @@ function renderStops(distanceMap = {}) {
 
     const div = document.createElement('div');
     div.className = "card stop" + (isFound ? " found" : "");
-    const arBtn = (s.usdz && canCatch)
-      ? `<a class="btn secondary" rel="ar" href="${s.usdz}">Ver en AR</a>`
-      : `<button class="btn secondary" disabled title="Acércate para ver en AR">Ver en AR</button>`;
+    const camBtn = canCatch
+      ? `<button class="btn secondary" data-cam="${s.id}">Ver en cámara</button>`
+      : `<button class="btn secondary" disabled title="Acércate para usar cámara">Ver en cámara</button>`;
+
     div.innerHTML = `
       <div>
         <div><strong>${s.title}</strong></div>
         <div class="meta">Radio: ${s.radius} m · ${d!=null?`Distancia: ${fmtMeters(d)}`:""}</div>
         <div class="meta">${isFound ? "✅ Carta atrapada" : "Pendiente"}</div>
-        ${isFound && s.image ? `<img class="card-img" src="${s.image}" alt="">` : ""}
         ${isFound ? `<div class="pill">${s.message}</div>` : ""}
       </div>
       <div class="btns">
-        ${arBtn}
+        ${camBtn}
         <button data-id="${s.id}" class="btn" ${isFound || !canCatch ? "disabled":""}>
           Atrapar carta
         </button>
@@ -164,12 +207,10 @@ function renderStops(distanceMap = {}) {
     stopsList.appendChild(div);
   });
 
-  // progreso
   const got = found.size, total = STOPS.length;
   document.getElementById('progressText').textContent = `${got} de ${total} cartas`;
   document.getElementById('bar').style.width = (total? (100*got/total):0) + "%";
 
-  // final
   const showFinal = (found.size === STOPS.length);
   const finalCard = document.getElementById('finalCard');
   finalCard.style.display = showFinal ? "block" : "none";
@@ -185,8 +226,15 @@ function renderStops(distanceMap = {}) {
 }
 renderStops();
 
-// Capturar
+// Clicks (cámara / captura / reset)
 stopsList.addEventListener('click', (e)=>{
+  const camBtn = e.target.closest('button[data-cam]');
+  if (camBtn){
+    const stopId = camBtn.getAttribute('data-cam');
+    const stop = STOPS.find(x=>x.id===stopId);
+    if (stop) openCamera(stop);
+    return;
+  }
   const btn = e.target.closest('button[data-id]');
   if(!btn) return;
   const id = btn.getAttribute('data-id');
@@ -197,8 +245,14 @@ stopsList.addEventListener('click', (e)=>{
   btn.disabled = true;
   renderStops(lastDistances);
 });
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  localStorage.removeItem(STORAGE_KEY);
+  found = new Set();
+  renderStops(lastDistances);
+  alert("Progreso reiniciado. 🎯");
+});
 
-// Distancias
+// Distancias / GPS
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = x => x * Math.PI/180;
@@ -245,8 +299,202 @@ function startGPS(){
     timeout: 15000
   });
 }
-
 document.getElementById('startBtn').addEventListener('click', startGPS);
+
+// ===== CÁMARA + MINI-JUEGO =====
+const camOverlay = document.getElementById('camOverlay');
+const camVideo   = document.getElementById('camVideo');
+const camCanvas  = document.getElementById('camCanvas');
+const closeCam   = document.getElementById('closeCam');
+const throwHintBtn = document.getElementById('throwHintBtn');
+
+let camStream = null;
+let currentStop = null;
+
+let W=0,H=0,DPR=Math.max(1,window.devicePixelRatio||1);
+const ctx = camCanvas.getContext('2d');
+const imgCache = {};
+const game = { card:null, ball:null, gravity:1800, swipe:{active:false,sx:0,sy:0,ex:0,ey:0}, running:false, last:0 };
+
+function loadImage(src){
+  return imgCache[src] || (imgCache[src]=new Promise((res,rej)=>{
+    const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src;
+  }));
+}
+function resizeCanvas(){
+  const rect = camVideo.getBoundingClientRect();
+  W = Math.floor(rect.width); H = Math.floor(rect.height||W*1.6);
+  camCanvas.width = Math.floor(W*DPR);
+  camCanvas.height= Math.floor(H*DPR);
+  camCanvas.style.width = W+'px';
+  camCanvas.style.height= H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+
+async function openCamera(stop){
+  currentStop = stop;
+  camOverlay.style.display = "block";
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:"environment"}, audio:false });
+    camVideo.srcObject = camStream;
+    await camVideo.play();
+    camVideo.addEventListener('loadedmetadata', resizeCanvas, { once:true });
+  }catch(err){
+    alert("No se pudo acceder a la cámara. Asegúrate de estar en HTTPS y dar permiso.");
+    closeCamera();
+    return;
+  }
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const cardImg = await loadImage(stop.camImg || "models/carta1.png");
+  const cardW = Math.min(W*0.42, 320), cardH = cardW*1.5;
+  const cardX = (W-cardW)/2;
+  const cardY = H*0.22;
+  game.card = {x:cardX,y:cardY,w:cardW,h:cardH,img:cardImg};
+
+  const r = Math.max(22, W*0.055);
+  game.ball = {x: W*0.5, y: H*0.82, r, vx:0, vy:0, flying:false};
+
+  game.running = true; game.last = 0;
+  requestAnimationFrame(loop);
+
+  camCanvas.addEventListener('pointerdown', onDown);
+  camCanvas.addEventListener('pointermove', onMove);
+  camCanvas.addEventListener('pointerup',   onUp);
+}
+
+function closeCamera(){
+  game.running=false;
+  camCanvas.removeEventListener('pointerdown', onDown);
+  camCanvas.removeEventListener('pointermove', onMove);
+  camCanvas.removeEventListener('pointerup',   onUp);
+  window.removeEventListener('resize', resizeCanvas);
+
+  camOverlay.style.display = "none";
+  camVideo.pause();
+  if (camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  currentStop=null;
+}
+
+function onDown(e){
+  const rect = camCanvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const b = game.ball;
+  if(!b) return;
+  const dx=x-b.x, dy=y-b.y;
+  if(dx*dx+dy*dy <= b.r*b.r*1.8){
+    game.swipe = {active:true,sx:x,sy:y,ex:x,ey:y};
+  }
+}
+function onMove(e){
+  if(!game.swipe.active) return;
+  const rect = camCanvas.getBoundingClientRect();
+  game.swipe.ex = e.clientX-rect.left;
+  game.swipe.ey = e.clientY-rect.top;
+}
+function onUp(){
+  const b=game.ball; if(!game.swipe.active||!b||b.flying){ game.swipe.active=false; return; }
+  const dx=game.swipe.ex-game.swipe.sx, dy=game.swipe.ey-game.swipe.sy;
+  const mag=Math.hypot(dx,dy);
+  if(mag<12){ game.swipe.active=false; return; }
+  const ang=Math.atan2(dy,dx);
+  const speed=Math.min(1,mag/220)*1400;
+  b.vx=Math.cos(ang)*speed;
+  b.vy=Math.sin(ang)*speed;
+  b.flying=true;
+  game.swipe.active=false;
+}
+
+function loop(ts){
+  if(!game.running) return;
+  if(!game.last) game.last = ts;
+  const dt = Math.min(0.033, (ts-game.last)/1000);
+  game.last = ts;
+
+  const b=game.ball, t=game.card;
+
+  if(b && b.flying){
+    b.vy += game.gravity*dt;
+    b.x += b.vx*dt;
+    b.y += b.vy*dt;
+    if(b.x<b.r){ b.x=b.r; b.vx*=-0.4; }
+    if(b.x>W-b.r){ b.x=W-b.r; b.vx*=-0.4; }
+    if(b.y>H-b.r){ b.y=H-b.r; b.vy*=-0.35; b.vx*=0.96; if(Math.abs(b.vy)<60){ b.vy=0; b.flying=false; } }
+  }
+
+  ctx.clearRect(0,0,W,H);
+  if(t){ ctx.drawImage(t.img, t.x, t.y, t.w, t.h); }
+
+  if(b){
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fillStyle="#ff5a7a"; ctx.fill();
+    ctx.save(); ctx.translate(b.x,b.y-2); ctx.fillStyle="#fff"; heartPath(ctx,b.r*0.38); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.22,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fill();
+  }
+
+  if(game.swipe.active){
+    ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(game.swipe.sx,game.swipe.sy);
+    ctx.lineTo(game.swipe.ex,game.swipe.ey); ctx.stroke();
+  }
+
+  if(b && t && b.x>t.x && b.x<t.x+t.w && b.y>t.y && b.y<t.y+t.h){
+    onCaught(); return;
+  }
+
+  requestAnimationFrame(loop);
+}
+
+function heartPath(ctx, s){
+  ctx.beginPath();
+  ctx.moveTo(0, s*0.6);
+  ctx.bezierCurveTo(-s, -s*0.2, -s*0.9, -s, 0, -s*0.6);
+  ctx.bezierCurveTo(s*0.9, -s, s, -s*0.2, 0, s*0.6);
+}
+
+function onCaught(){
+  if(currentStop && !found.has(currentStop.id)){
+    found.add(currentStop.id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
+  }
+  setTimeout(()=>{
+    closeCamera();
+    renderStops(lastDistances);
+    alert("¡Carta capturada! 💛");
+  }, 120);
+}
+closeCam.addEventListener('click', closeCamera);
+throwHintBtn.addEventListener('click', ()=>alert("Consejo: toca cerca de la bola y desliza hacia la carta. Mientras más largo y recto el swipe, más velocidad."));
+
+// ===== PWA: registrar SW y manejar instalación =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+
+let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'inline-block';
+});
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = 'none';
+});
+
+// iOS: mostrar mini banner “Añadir a pantalla”
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+if (isiOS && !isStandalone) {
+  const iosBar = document.getElementById('iosA2HS');
+  iosBar.style.display = 'block';
+  document.getElementById('iosA2HSClose').onclick = ()=> iosBar.style.display='none';
+}
 </script>
 </body>
 </html>
