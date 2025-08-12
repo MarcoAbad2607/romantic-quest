@@ -112,11 +112,11 @@
 
 <!-- LANDING: pantalla inicial -->
 <div id="landingOverlay">
-  <div class="title">Amor GO</div>
-  <div class="subtitle">Una búsqueda con mapas, cámara y sorpresas 💛</div>
+  <div class="title">Armando GO</div>
+  <div class="subtitle">Un juego hecho especialmente para ti: Armando 💛</div>
 
   <div class="howBox">
-    <h3>Cómo se juega</h3>
+    <h3>Cómo se juega?</h3>
     <ol>
       <li>Presiona <strong>Iniciar juego</strong> y acepta el aviso de seguridad.</li>
       <li>Concede permisos de <strong>ubicación</strong> y camina hacia las paradas.</li>
@@ -137,8 +137,8 @@
   <div class="box">
     <img src="models/safety_walk.png" alt="Mantente alerta al caminar" onerror="this.src='data:image/svg+xml;charset=utf8,'+encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'960\' height=\'540\'><rect width=\'100%\' height=\'100%\' fill=\'#222'/><text x=\'50%\' y=\'50%\' fill=\'#fff\' font-size=\'28\' text-anchor=\'middle\'>Mantente alerta al caminar</text></svg>')">
     <div class="inner">
-      <h3>¡Mantente alerta al caminar! 🚶‍♀️🚶‍♂️</h3>
-      <p>Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución.</p>
+      <h3>¡Mantente alerta al caminar Amor! 🚶‍♀️🚶‍♂️</h3>
+      <p>Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución. Te quiero para mas rato, Armando jaja</p>
       <div class="flex" style="justify-content:flex-end">
         <button id="safetyOkBtn" class="btn">Entendido, jugar con cuidado</button>
       </div>
@@ -211,17 +211,17 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
-  { id:"cafe",   name:"Plaza Puerta la Victoria", lat: 20.5935, lng: -100.3923, radius: 120,
-    title:"Nuestra primera charla ☕",
-    message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
+  { id:"cafe",   name:"Plaza Puerta la Victoria", lat: 20.5935, lng: -100.3923, radius: 50000,
+    title:"Cine 🎬 ",
+    message:"Aquí es donde me empece a enamorar. Gracias por esta salida.",
     camImg:"models/carta1.png" },
-  { id:"parque", name:"Alameda Hidalgo", lat: 20.6008, lng: -100.3890, radius: 120,
+  { id:"parque", name:"Alameda", lat: 20.6008, lng: -100.3890, radius: 120,
     title:"El parque de las risas 🌳",
-    message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
+    message:"Prometo más salidas como esta.",
     camImg:"models/carta2.png" },
-  { id:"cine",   name:"Centro Histórico", lat: 20.5871, lng: -100.3899, radius: 120,
-    title:"Butacas cómplices 🎬",
-    message:"La película fue buena, pero tu mano en la mía fue mejor.",
+  { id:"cine",   name:"Maniatica", lat: 20.5871, lng: -100.3899, radius: 120,
+    title:"Nuestra primer cita ☕",
+    message:"Perdon por decir eso ese dia, espero esto lo compence jaja.",
     camImg:"models/carta3.png" }
 ];
 
