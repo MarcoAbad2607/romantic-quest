@@ -3,15 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Romantic Quest GO</title>
+  <title>Amor GO</title>
 
-  <!-- Mapbox GL JS v2.15 (iPhone-friendly) -->
+  <!-- Mapbox GL JS v2.15 (compatible iPhone) -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-
-  <!-- Three.js + GLTFLoader (para el avatar 3D) -->
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
 
   <style>
     :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
@@ -21,7 +17,7 @@
     header{padding:16px 20px calc(16px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
     h1{margin:0;font-size:18px}
 
-    /* Mapa grande, estilo simple (sin edificios) */
+    /* Mapa más grande por defecto */
     #map{height:70vh}
 
     .wrap{padding:16px}
@@ -43,31 +39,34 @@
     .big{font-size:18px}
     .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 
-    /* Overlay cámara + juego */
-    #camOverlay{position:fixed;inset:0;background:#000;display:none;z-index:9999}
-    #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
-    #camCanvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
-    #camTopBar{
-      position:absolute;top:0;left:0;right:0;display:flex;gap:8px;justify-content:flex-end;
-      padding:10px calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left));
-      background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0))
+    /* ===== Avatar “falso 3D” con sombra y pasos ===== */
+    @keyframes avatar-walk-bob{
+      0%{transform:translateY(0) rotateX(var(--tilt,22deg)) rotate(var(--rot,0deg))}
+      50%{transform:translateY(-6px) rotateX(var(--tilt,22deg)) rotate(var(--rot,0deg))}
+      100%{transform:translateY(0) rotateX(var(--tilt,22deg)) rotate(var(--rot,0deg))}
     }
-    #closeCam,#throwHintBtn{background:#2a2a39;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:600}
-    #camHint{
-      position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;font-size:14px;
-      background:rgba(0,0,0,.35);padding:8px 12px;border-radius:10px
+    @keyframes avatar-idle-breathe{
+      0%{transform:scale(1) rotateX(var(--tilt,22deg)) rotate(var(--rot,0deg))}
+      50%{transform:scale(1.02) rotateX(var(--tilt,22deg)) rotate(var(--rot,0deg))}
+      100%{transform:scale(1) rotateX(var(--tilt,22deg)) rotate(var(--rot,0deg))}
     }
-
-    /* avisos */
-    #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;
-      background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
-
-    /* Modal de premio */
-    #rewardModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10001}
-    #rewardModal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
-    #rewardModal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
-    #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
-    #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
+    .avatar-wrap{
+      width:100px;height:100px;transform:translate(-50%,-50%);
+      position:relative;perspective:900px;
+    }
+    .avatar{
+      width:100px;height:100px;transform-origin:50% 80%;
+      filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+      backface-visibility:hidden;will-change:transform;
+    }
+    .avatar.walk{animation:avatar-walk-bob var(--stepDur,480ms) infinite ease-in-out}
+    .avatar.idle{animation:avatar-idle-breathe 2.6s infinite ease-in-out;opacity:.98}
+    .avatar-shadow{
+      position:absolute;left:50%;top:86%;width:78px;height:20px;
+      transform:translate(-50%,-50%) scale(var(--sh,1)) rotate(var(--rot,0deg));
+      background:radial-gradient(ellipse at center, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 70%);
+      filter:blur(1px);pointer-events:none;
+    }
 
     /* Pantalla completa (fallback iOS) */
     body.is-fs header, body.is-fs .wrap{display:none}
@@ -78,12 +77,10 @@
 </head>
 <body>
 <header>
-  <h1>Romantic Quest GO ✨</h1>
+  <h1>Amor GO ✨</h1>
 </header>
 
-<!-- Botón de salida (visible solo en fallback de pantalla completa) -->
 <button id="fsExitBtn" class="fs-exit">Salir de pantalla completa</button>
-
 <div id="map"></div>
 
 <div class="wrap">
@@ -111,9 +108,7 @@
     <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
   </div>
 
-  <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=9</code> para forzar recarga (caché).
-  </p>
+  <p class="footer-note">Tip: si algo no carga, abre con <code>?v=8</code> para forzar recarga (caché).</p>
 </div>
 
 <!-- Overlay de cámara con juego de captura -->
@@ -127,7 +122,6 @@
   <div id="camHint">Toca cerca de la bola y desliza hacia la carta para lanzarla ❤️</div>
 </div>
 
-<!-- avisos -->
 <div id="msgBar"></div>
 
 <!-- Modal de premio -->
@@ -146,7 +140,7 @@
 
 <script>
 /* ========= CONFIG ========= */
-mapboxgl.accessToken = 'TU_TOKEN_MAPBOX_AQUI'; // ← reemplaza por tu token
+mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
   { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
@@ -193,10 +187,10 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* ========= MAPA (simple, sin edificios) ========= */
+/* ========= MAPA ========= */
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/navigation-day-v1',  // simple
+  style: 'mapbox://styles/mapbox/navigation-day-v1',
   center: [-100.389, 20.595],
   zoom: 15.5,
   pitch: 60,
@@ -207,8 +201,6 @@ map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-ri
 
 map.on('style.load', () => {
   addStopMarkers();
-  // Agregamos el custom layer 3D cuando cargue el estilo
-  map.addLayer(avatar3DLayer);
 });
 
 /* Marcadores de paradas */
@@ -331,12 +323,36 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   showMsg("Progreso reiniciado. 🎯");
 });
 
-/* ========= GPS + ruta + MODO CAMINATA ========= */
+/* ========= GPS + AVATAR ========= */
 let watchId = null;
 let lastDistances = {};
+let myMarker = null;
 let walkingMode = false;
 let lastPos = null;
 let headingFromCompass = null;
+
+function applyAvatarMotion(speedMps, bearingDeg){
+  const el = myMarker?.getElement();
+  if (!el) return;
+  const img = el.querySelector('.avatar');
+  const sh  = el.querySelector('.avatar-shadow');
+  if (!img || !sh) return;
+
+  if (typeof bearingDeg === 'number') {
+    img.style.setProperty('--rot', `${bearingDeg}deg`);
+    sh.style.setProperty('--rot', `${bearingDeg}deg`);
+  }
+  if (speedMps > 0.6) {
+    img.classList.add('walk'); img.classList.remove('idle');
+    const step = Math.max(240, Math.min(700, 1200/(speedMps + 0.5)));
+    img.style.setProperty('--stepDur', `${Math.round(step)}ms`);
+  } else {
+    img.classList.add('idle'); img.classList.remove('walk');
+    img.style.removeProperty('--stepDur');
+  }
+  const shadowScale = Math.max(0.9, Math.min(1.5, 1 + speedMps/3));
+  sh.style.setProperty('--sh', shadowScale.toFixed(2));
+}
 
 document.getElementById('walkBtn').addEventListener('click', async ()=>{
   walkingMode = !walkingMode;
@@ -357,14 +373,34 @@ window.addEventListener('deviceorientation', (e)=>{
   else if (e.absolute === true && typeof e.alpha === 'number') headingFromCompass = 360 - e.alpha;
 }, { passive:true });
 
-function onSpeedComputed(speedMps){
-  // Cambia animación del avatar 3D
-  if (speedMps > 0.6) playAnim('Walk'); else playAnim('Idle');
-}
-
 function updateDistances(pos){
   const { latitude:lat, longitude:lng } = pos.coords;
   const nowTs = (typeof pos.timestamp==='number') ? pos.timestamp : Date.now();
+
+  // Crear/actualizar avatar marker
+  if (!myMarker){
+    const wrap = document.createElement('div');
+    wrap.className = 'avatar-wrap';
+    wrap.style.setProperty('--tilt', '20deg'); // más “parado” (prueba 16–24)
+
+    const img = document.createElement('img');
+    img.src = 'models/avatar.png';
+    img.alt = 'Yo';
+    img.className = 'avatar idle';
+
+    const shadow = document.createElement('div');
+    shadow.className = 'avatar-shadow';
+
+    wrap.appendChild(shadow);
+    wrap.appendChild(img);
+
+    myMarker = new mapboxgl.Marker(wrap, { anchor: 'center', rotationAlignment: 'map' })
+      .setLngLat([lng, lat]).addTo(map);
+
+    map.easeTo({ center:[lng, lat], zoom:16, duration:600 });
+  } else {
+    myMarker.setLngLat([lng, lat]);
+  }
 
   // Distancias + UI
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
@@ -389,8 +425,7 @@ function updateDistances(pos){
     const toRad = d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
     const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
     const y=Math.sin(Δλ)*Math.cos(φ2);
-    const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-    bearing = (toDeg(Math.atan2(y,x))+360)%360;
+    const x=Math.cos(φ1)*sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
   }
 
   // Velocidad (m/s)
@@ -401,7 +436,8 @@ function updateDistances(pos){
     speed = dist / dt;
   }
 
-  // Mueve cámara si estás en modo caminata
+  applyAvatarMotion(speed, bearing);
+
   if (walkingMode){
     map.easeTo({
       center: [lng, lat],
@@ -410,19 +446,9 @@ function updateDistances(pos){
       bearing: (typeof bearing === 'number') ? bearing : map.getBearing(),
       duration: 600
     });
-  } else {
-    // En modo normal, centra suave al inicio
-    if (!updateDistances._centered) {
-      map.easeTo({ center:[lng, lat], zoom:16, duration:600 });
-      updateDistances._centered = true;
-    }
   }
 
-  // Actualiza datos globales para el layer 3D
-  lastPos = { lat, lng, ts: nowTs, bearing };
-
-  // Actualiza animación según velocidad
-  onSpeedComputed(speed);
+  lastPos = { lat, lng, ts: nowTs };
 }
 
 function startGPS(){
@@ -460,7 +486,6 @@ function exitCssFullscreen(){
   fsExitBtn.style.display = 'none';
   map.resize();
 }
-
 fsBtn.addEventListener('click', ()=>{
   const ok = enterNativeFullscreen();
   if (!ok) enterCssFullscreen();
@@ -474,7 +499,7 @@ fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
   });
 });
 
-/* ========= CÁMARA + MINI-JUEGO (igual que antes) ========= */
+/* ========= CÁMARA + MINI-JUEGO ========= */
 const camOverlay = document.getElementById('camOverlay');
 const camVideo   = document.getElementById('camVideo');
 const camCanvas  = document.getElementById('camCanvas');
@@ -528,7 +553,7 @@ async function openCamera(stop){
   const cardImg = await loadImage(stop.camImg || "models/carta1.png");
   const cardW = Math.min(W*0.42, 320), cardH = cardW*1.5;
   const speed = rand(DIFFICULTY.cardSpeedMin, DIFFICULTY.cardSpeedMax);
-  const angle = rand(0, Math.PI*2);
+  const angle = Math.random()*Math.PI*2;
   game.card = {x:(W-cardW)/2, y:H*0.22, w:cardW, h:cardH, img:cardImg, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed, t:0};
 
   const r = Math.max(22, W*0.055);
@@ -584,9 +609,8 @@ function loop(ts){
     const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
     if(t.x<6){ t.x=6; t.vx*=-1; } if(t.x+t.w>W-6){ t.x=W-6-t.w; t.vx*=-1; }
     if(t.y<6){ t.y=6; t.vy*=-1; } if(t.y+t.h>H*0.9){ t.y=H*0.9-t.h; t.vy*=-1; }
-    const drawY = t.y + wobble;
     ctx.clearRect(0,0,W,H);
-    ctx.drawImage(t.img, t.x, drawY, t.w, t.h);
+    ctx.drawImage(t.img, t.x, t.y + wobble, t.w, t.h);
   } else { ctx.clearRect(0,0,W,H); }
 
   if(b){
@@ -636,84 +660,6 @@ function showReward(id){
 }
 rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
 rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
-
-/* ========= AVATAR 3D: custom layer con Three.js ========= */
-let threeScene, threeCamera, threeRenderer, threeMixer, threeModel, currentAction=null;
-const modelUrl = 'models/avatar3d/lowpoly_avatar.gltf'; // ← ruta del glTF
-
-function playAnim(name){
-  if (!threeMixer || !threeModel) return;
-  const clip = THREE.AnimationClip.findByName(threeModel.animations || [], name);
-  if (!clip) return;
-  const action = threeMixer.clipAction(clip);
-  if (currentAction && currentAction !== action) currentAction.crossFadeTo(action, 0.25, false);
-  action.reset().play();
-  currentAction = action;
-}
-
-let _lastTime = performance.now();
-const avatar3DLayer = {
-  id: 'avatar-3d',
-  type: 'custom',
-  renderingMode: '3d',
-  onAdd: function(map, gl) {
-    threeScene = new THREE.Scene();
-    threeCamera = new THREE.Camera();
-    threeRenderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
-    threeRenderer.autoClear = false;
-
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(2,6,3);
-    threeScene.add(hemi); threeScene.add(dir);
-
-    const loader = new THREE.GLTFLoader();
-    loader.load(modelUrl, (gltf) => {
-      threeModel = gltf.scene;
-      threeModel.animations = gltf.animations || [];
-      // Ajusta tamaño del personaje (1 = metros reales)
-      threeModel.scale.set(1.0, 1.0, 1.0);
-      threeScene.add(threeModel);
-      threeMixer = new THREE.AnimationMixer(threeModel);
-      playAnim('Idle');
-    });
-  },
-  render: function(gl, matrix) {
-    if (!threeModel) { map.triggerRepaint(); return; }
-
-    // Posición actual
-    const lng = lastPos?.lng ?? map.getCenter().lng;
-    const lat = lastPos?.lat ?? map.getCenter().lat;
-    const alt = 0;
-
-    const mc = mapboxgl.MercatorCoordinate.fromLngLat({ lng, lat }, alt);
-    const scale = mc.meterInMercatorCoordinateUnits();
-
-    // Matriz de modelo (traslado + escala)
-    const modelMatrix = new THREE.Matrix4()
-      .makeTranslation(mc.x, mc.y, mc.z)
-      .multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
-
-    threeModel.matrixAutoUpdate = false;
-    threeModel.matrix = modelMatrix;
-
-    // Rotación en Y según brújula
-    if (typeof lastPos?.bearing === 'number') {
-      threeModel.rotation.set(0, THREE.MathUtils.degToRad(lastPos.bearing), 0);
-    }
-
-    // Avanza animación con delta real
-    const now = performance.now();
-    const dt = Math.min(0.05, (now - _lastTime)/1000);
-    _lastTime = now;
-    if (threeMixer) threeMixer.update(dt);
-
-    threeRenderer.state.reset();
-    threeRenderer.render(threeScene, threeCamera);
-    map.triggerRepaint();
-  }
-};
-
-/* ========= START ========= */
 </script>
 </body>
 </html>
