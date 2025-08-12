@@ -89,7 +89,19 @@
     /* Caja de instrucciones en landing */
     #landingOverlay .howBox{max-width:720px;margin:0 16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:14px}
     #landingOverlay .howBox h3{margin:0 0 6px 0}
-    #landingOverlay .howBox ol{margin:6px 0 0 18px; padding:0}
+    #landingOverlay .howBox ol{margin:6px 0 0 18px; padding:0}    /* === AVISO DE SEGURIDAD (tipo Pokémon GO) === */
+
+    /* === MARCADORES PERSONALIZADOS + POPUPS === */
+    .marker{width:38px;height:38px;border-radius:14px;border:2px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.35);display:grid;place-items:center}
+    .marker-stop{background:linear-gradient(180deg,#5a7dff,#3a3af6)}
+    .marker-final{background:linear-gradient(180deg,#ffd54d,#ffb300)}
+    .marker svg{display:block}
+    .marker .ico{filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+
+    /* Popups con texto negro y más legible */
+    .popup-darktext .mapboxgl-popup-content{background:#fff;color:#000;font-weight:600}
+    .popup-darktext .mapboxgl-popup-content .popup-sub{font-weight:500;opacity:.8;margin-top:2px}
+    .popup-darktext .mapboxgl-popup-tip{border-top-color:#fff!important;border-bottom-color:#fff!important}
 
     /* === AVISO DE SEGURIDAD (tipo Pokémon GO) === */
     #safetyOverlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:10003}
@@ -213,7 +225,7 @@ const STOPS = [
     title:"Nuestra primera charla ☕",
     message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
     camImg:"models/carta1.png" },
-  { id:"parque", name:"Alameda Hidalgo", lat: 20.6008, lng: -100.3890, radius: 50000,
+  { id:"parque", name:"Alameda Hidalgo", lat: 20.6008, lng: -100.3890, radius: 120,
     title:"El parque de las risas 🌳",
     message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
     camImg:"models/carta2.png" },
@@ -230,9 +242,9 @@ const FINAL_DESTINATION = {
 };
 
 const REWARDS = {
-  cafe:   { title:"Cupón de café ☕", text:"¡Ganaste un cafecito a mi cuenta!", img:"models/cupon_cafe.png", url:"#cafe" },
-  parque: { title:"Cupón picnic 🌳", text:"Picnic bajo los árboles, yo invito.", img:"models/cupon_picnic.png", url:"#picnic" },
-  cine:   { title:"Cupón cine 🎬", text:"Noche de película y palomitas.", img:"models/cupon_cine.png", url:"#cine" }
+  cafe:   { title:"Cupón de café ☕", text:"Vale por un café juntos en Puerta la Victoria. (Solo válido con besos incluidos)", img:"models/cupon_cafe.png", url:"#cafe" },
+  parque: { title:"Cupón picnic 🌳", text:"Vale por picnic en la Alameda: mantita, música y snacks preparados por mí.", img:"models/cupon_picnic.png", url:"#picnic" },
+  cine:   { title:"Cupón cine 🎬", text:"Vale por noche de película en el Centro: tú eliges la cinta, yo invito las palomitas.", img:"models/cupon_cine.png", url:"#cine" }
 };
 
 const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFreq: 2.2 };
@@ -273,10 +285,31 @@ map.on('style.load', () => {
 function addStopMarkers(){
   STOPS.forEach(s => {
     const el = document.createElement('div');
-    el.style.width='16px'; el.style.height='16px'; el.style.borderRadius='50%';
-    el.style.border='2px solid #fff'; el.style.background='#3a3af6';
-    new mapboxgl.Marker(el).setLngLat([s.lng, s.lat])
-      .setPopup(new mapboxgl.Popup({ offset:12 }).setText(s.title)).addTo(map);
+    el.className = 'marker marker-stop';
+    el.innerHTML = `
+      <svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 21s-7-4.438-7-10a7 7 0 1 1 14 0c0 5.562-7 10-7 10Z" fill="#fff"/>
+        <path d="M12 8.2c-1.657 0-3 1.343-3 3 0 2.25 3 4.8 3 4.8s3-2.55 3-4.8c0-1.657-1.343-3-3-3Z" fill="#ff5a7a"/>
+      </svg>`;
+    new mapboxgl.Marker(el, {anchor:'center'})
+      .setLngLat([s.lng, s.lat])
+      .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' })
+        .setHTML(`<div><strong>${s.name || s.title}</strong><div class="popup-sub">${s.title}</div></div>`))
+      .addTo(map);
+  });
+
+  const elf = document.createElement('div');
+  elf.className = 'marker marker-final';
+  elf.innerHTML = `
+    <svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2l2.952 6.006L22 8.764l-5 4.873L18.902 22 12 18.4 5.098 22 7 13.637l-5-4.873 7.048-1.758L12 2Z" fill="#fff"/>
+    </svg>`;
+  new mapboxgl.Marker(elf, {anchor:'center'})
+    .setLngLat([FINAL_DESTINATION.lng, FINAL_DESTINATION.lat])
+    .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' })
+      .setHTML('<div><strong>Destino final 💛</strong><div class="popup-sub">¡No veas el spoiler hasta juntar todo!</div></div>'))
+    .addTo(map);
+}).setText(s.title)).addTo(map);
   });
   const elf = document.createElement('div');
   elf.style.width='18px'; elf.style.height='18px'; elf.style.borderRadius='50%';
