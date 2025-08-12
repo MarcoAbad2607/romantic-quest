@@ -5,31 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Amor GO</title>
 
-  <!-- Mapbox GL JS -->
+  <!-- Mapbox GL JS v2.15 (compatible iPhone) -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 
   <style>
-    :root{
-      --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d;
-      --tilt: 20deg;           /* inclinación del avatar */
-      --avatar-size: 128px;    /* tamaño base del avatar */
-      --shadow-w: 92px;        /* ancho base de la sombra */
-    }
-    @media (max-width: 640px){
-      :root{
-        --tilt: 18deg;
-        --avatar-size: 156px;  /* más grande en móvil */
-        --shadow-w: 110px;
-      }
-    }
+    :root { --bg:#0e0e12; --card:#171720; --ink:#f6f7fb; --muted:#b3b8c4; --acc:#ffd54d; }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--ink)}
     header{padding:16px 20px calc(16px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
     h1{margin:0;font-size:18px}
 
-    /* Mapa alto */
+    /* Mapa más grande por defecto */
     #map{height:70vh}
 
     .wrap{padding:16px}
@@ -51,36 +39,39 @@
     .big{font-size:18px}
     .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 
-    /* ===== Avatar “falso 3D” con sombra y pasos ===== */
-    @keyframes avatar-walk-bob{
-      0%{transform:translateY(0) rotateX(var(--tilt)) rotate(var(--rot,0deg))}
-      50%{transform:translateY(-6px) rotateX(var(--tilt)) rotate(var(--rot,0deg))}
-      100%{transform:translateY(0) rotateX(var(--tilt)) rotate(var(--rot,0deg))}
+    /* Avatar con “pasitos” */
+    @keyframes avatar-walk-bob { 0%{transform:translateY(0) rotate(var(--rot,0deg))} 50%{transform:translateY(-4px) rotate(var(--rot,0deg))} 100%{transform:translateY(0) rotate(var(--rot,0deg))} }
+    @keyframes avatar-idle-breathe { 0%{transform:scale(1) rotate(var(--rot,0deg))} 50%{transform:scale(1.02) rotate(var(--rot,0deg))} 100%{transform:scale(1) rotate(var(--rot,0deg))} }
+    .avatar-wrap{ width:100px; height:100px; transform:translate(-50%,-50%) }
+    .avatar{ width:100px; height:100px; transform-origin:50% 50%; filter:drop-shadow(0 1px 2px rgba(0,0,0,.35)) }
+    .avatar.walk{ animation:avatar-walk-bob var(--stepDur,480ms) infinite ease-in-out }
+    .avatar.idle{ animation:avatar-idle-breathe 2.6s infinite ease-in-out; opacity:.98 }
+
+    /* Overlay cámara + juego */
+    #camOverlay{position:fixed;inset:0;background:#000;display:none;z-index:9999}
+    #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+    #camCanvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+    #camTopBar{
+      position:absolute;top:0;left:0;right:0;display:flex;gap:8px;justify-content:flex-end;
+      padding:10px calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left));
+      background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0))
     }
-    @keyframes avatar-idle-breathe{
-      0%{transform:scale(1) rotateX(var(--tilt)) rotate(var(--rot,0deg))}
-      50%{transform:scale(1.02) rotateX(var(--tilt)) rotate(var(--rot,0deg))}
-      100%{transform:scale(1) rotateX(var(--tilt)) rotate(var(--rot,0deg))}
+    #closeCam,#throwHintBtn{background:#2a2a39;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:600}
+    #camHint{
+      position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;font-size:14px;
+      background:rgba(0,0,0,.35);padding:8px 12px;border-radius:10px
     }
-    .avatar-wrap{
-      width:var(--avatar-size); height:var(--avatar-size);
-      transform:translate(-50%,-50%); position:relative; perspective:900px;
-      pointer-events:none;
-    }
-    .avatar{
-      width:100%; height:100%; transform-origin:50% 80%;
-      filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
-      backface-visibility:hidden; will-change:transform;
-    }
-    .avatar.walk{animation:avatar-walk-bob var(--stepDur,480ms) infinite ease-in-out}
-    .avatar.idle{animation:avatar-idle-breathe 2.6s infinite ease-in-out;opacity:.98}
-    .avatar-shadow{
-      position:absolute; left:50%; top:86%;
-      width:var(--shadow-w); height:22px;
-      transform:translate(-50%,-50%) scale(var(--sh,1)) rotate(var(--rot,0deg));
-      background:radial-gradient(ellipse at center, rgba(0,0,0,.36) 0%, rgba(0,0,0,0) 70%);
-      filter:blur(1px);
-    }
+
+    /* avisos */
+    #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;
+      background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
+
+    /* Modal de premio */
+    #rewardModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10001}
+    #rewardModal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+    #rewardModal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
+    #rewardModal img{width:100%;border-radius:12px;margin:8px 0}
+    #rewardModal .row{display:flex;gap:8px;justify-content:flex-end}
 
     /* Pantalla completa (fallback iOS) */
     body.is-fs header, body.is-fs .wrap{display:none}
@@ -94,7 +85,9 @@
   <h1>Amor GO ✨</h1>
 </header>
 
+<!-- Botón de salida (visible solo en fallback de pantalla completa) -->
 <button id="fsExitBtn" class="fs-exit">Salir de pantalla completa</button>
+
 <div id="map"></div>
 
 <div class="wrap">
@@ -122,10 +115,12 @@
     <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
   </div>
 
-  <p class="footer-note">Tip: si algo no carga, abre con <code>?v=8</code> para forzar recarga (caché).</p>
+  <p class="footer-note">
+    Tip: si algo no carga, abre con <code>?v=8</code> para forzar recarga (caché).
+  </p>
 </div>
 
-<!-- Overlay cámara + juego de captura (lo de siempre) -->
+<!-- Overlay de cámara con juego de captura -->
 <div id="camOverlay">
   <video id="camVideo" autoplay playsinline muted></video>
   <canvas id="camCanvas"></canvas>
@@ -136,16 +131,17 @@
   <div id="camHint">Toca cerca de la bola y desliza hacia la carta para lanzarla ❤️</div>
 </div>
 
-<div id="msgBar" style="display:none"></div>
+<!-- avisos -->
+<div id="msgBar"></div>
 
 <!-- Modal de premio -->
-<div id="rewardModal" style="display:none">
-  <div class="backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.55)"></div>
-  <div class="content" style="position:relative;max-width:420px;margin:16px auto;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff">
+<div id="rewardModal">
+  <div class="backdrop"></div>
+  <div class="content">
     <h3 id="rewardTitle" style="margin:0 0 8px 0;">¡Premio desbloqueado!</h3>
     <p id="rewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
-    <img id="rewardImg" alt="Premio" style="width:100%;border-radius:12px;margin:8px 0">
-    <div class="row" style="display:flex;gap:8px;justify-content:flex-end">
+    <img id="rewardImg" alt="Premio">
+    <div class="row">
       <a id="rewardUseBtn" class="btn" target="_blank" rel="noopener">Usar cupón</a>
       <button id="rewardCloseBtn" class="btn secondary">Cerrar</button>
     </div>
@@ -157,9 +153,18 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
-  { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000, title:"Nuestra primera charla ☕", message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.", camImg:"models/carta1.png" },
-  { id:"parque", lat: 20.6008, lng: -100.3890, radius: 50000, title:"El parque de las risas 🌳", message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.", camImg:"models/carta2.png" },
-  { id:"cine", lat: 20.5871, lng: -100.3899, radius: 50000, title:"Butacas cómplices 🎬", message:"La película fue buena, pero tu mano en la mía fue mejor.", camImg:"models/carta3.png" }
+  { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
+    title:"Nuestra primera charla ☕",
+    message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
+    camImg:"models/carta1.png" },
+  { id:"parque", lat: 20.6008, lng: -100.3890, radius: 50000,
+    title:"El parque de las risas 🌳",
+    message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
+    camImg:"models/carta2.png" },
+  { id:"cine", lat: 20.5871, lng: -100.3899, radius: 50000,
+    title:"Butacas cómplices 🎬",
+    message:"La película fue buena, pero tu mano en la mía fue mejor.",
+    camImg:"models/carta3.png" }
 ];
 
 const FINAL_DESTINATION = {
@@ -192,7 +197,7 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* ========= MAPA ========= */
+/* ========= MAPA (plano navegación) ========= */
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/navigation-day-v1',
@@ -204,8 +209,11 @@ const map = new mapboxgl.Map({
 });
 map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
-map.on('style.load', addStopMarkers);
+map.on('style.load', () => {
+  addStopMarkers();
+});
 
+/* Marcadores de paradas */
 function addStopMarkers(){
   STOPS.forEach(s => {
     const el = document.createElement('div');
@@ -221,7 +229,7 @@ function addStopMarkers(){
     .setPopup(new mapboxgl.Popup({ offset:12 }).setText('Destino final 💛')).addTo(map);
 }
 
-/* ========= RUTA ========= */
+/* ========= RUTA hacia la siguiente parada ========= */
 let routeSourceAdded = false;
 function drawRoute(geojson){
   if (!routeSourceAdded){
@@ -298,6 +306,7 @@ function renderStops(distanceMap = {}) {
 }
 renderStops();
 
+/* ========= eventos lista ========= */
 stopsList.addEventListener('click', (e)=>{
   const camBtn = e.target.closest('button[data-cam]');
   if (camBtn){
@@ -324,7 +333,7 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   showMsg("Progreso reiniciado. 🎯");
 });
 
-/* ========= GPS + AVATAR ========= */
+/* ========= GPS + ruta + MODO CAMINATA + AVATAR ========= */
 let watchId = null;
 let lastDistances = {};
 let myMarker = null;
@@ -332,27 +341,19 @@ let walkingMode = false;
 let lastPos = null;
 let headingFromCompass = null;
 
+// Animación/rotación del avatar según velocidad y rumbo
 function applyAvatarMotion(speedMps, bearingDeg){
-  const el = myMarker?.getElement();
-  if (!el) return;
-  const img = el.querySelector('.avatar');
-  const sh  = el.querySelector('.avatar-shadow');
-  if (!img || !sh) return;
-
-  if (typeof bearingDeg === 'number' && !Number.isNaN(bearingDeg)) {
-    img.style.setProperty('--rot', `${bearingDeg}deg`);
-    sh.style.setProperty('--rot', `${bearingDeg}deg`);
-  }
+  const img = myMarker?.getElement().querySelector('.avatar');
+  if (!img) return;
+  if (typeof bearingDeg === 'number') img.style.setProperty('--rot', `${bearingDeg}deg`);
   if (speedMps > 0.6) {
     img.classList.add('walk'); img.classList.remove('idle');
-    const step = Math.max(240, Math.min(700, 1200/(speedMps + 0.5)));
+    const step = Math.max(260, Math.min(700, 1200/(speedMps + 0.5)));
     img.style.setProperty('--stepDur', `${Math.round(step)}ms`);
   } else {
     img.classList.add('idle'); img.classList.remove('walk');
     img.style.removeProperty('--stepDur');
   }
-  const shadowScale = Math.max(0.9, Math.min(1.5, 1 + speedMps/3));
-  sh.style.setProperty('--sh', shadowScale.toFixed(2));
 }
 
 document.getElementById('walkBtn').addEventListener('click', async ()=>{
@@ -382,17 +383,10 @@ function updateDistances(pos){
   if (!myMarker){
     const wrap = document.createElement('div');
     wrap.className = 'avatar-wrap';
-    wrap.style.setProperty('--tilt', '20deg'); // ajusta 16–24deg a gusto
-
     const img = document.createElement('img');
-    img.src = 'models/avatar.png'; // tu PNG del avatar
+    img.src = 'models/avatar.png';
     img.alt = 'Yo';
     img.className = 'avatar idle';
-
-    const shadow = document.createElement('div');
-    shadow.className = 'avatar-shadow';
-
-    wrap.appendChild(shadow);
     wrap.appendChild(img);
 
     myMarker = new mapboxgl.Marker(wrap, { anchor: 'center', rotationAlignment: 'map' })
@@ -427,7 +421,7 @@ function updateDistances(pos){
     const φ1=toRad(lat), φ2=toRad(next.lat), Δλ=toRad(next.lng-lng);
     const y=Math.sin(Δλ)*Math.cos(φ2);
     const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-    bearing = (toDeg(Math.atan2(y,x))+360)%360;     // ← FIX: Math.sin estaba faltando
+    bearing = (toDeg(Math.atan2(y,x))+360)%360;
   }
 
   // Velocidad (m/s)
@@ -490,6 +484,7 @@ function exitCssFullscreen(){
   fsExitBtn.style.display = 'none';
   map.resize();
 }
+
 fsBtn.addEventListener('click', ()=>{
   const ok = enterNativeFullscreen();
   if (!ok) enterCssFullscreen();
@@ -503,7 +498,7 @@ fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
   });
 });
 
-/* ========= CÁMARA + MINI-JUEGO (igual que antes) ========= */
+/* ========= CÁMARA + MINI-JUEGO ========= */
 const camOverlay = document.getElementById('camOverlay');
 const camVideo   = document.getElementById('camVideo');
 const camCanvas  = document.getElementById('camCanvas');
@@ -557,7 +552,7 @@ async function openCamera(stop){
   const cardImg = await loadImage(stop.camImg || "models/carta1.png");
   const cardW = Math.min(W*0.42, 320), cardH = cardW*1.5;
   const speed = rand(DIFFICULTY.cardSpeedMin, DIFFICULTY.cardSpeedMax);
-  const angle = Math.random()*Math.PI*2;
+  const angle = rand(0, Math.PI*2);
   game.card = {x:(W-cardW)/2, y:H*0.22, w:cardW, h:cardH, img:cardImg, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed, t:0};
 
   const r = Math.max(22, W*0.055);
@@ -613,8 +608,9 @@ function loop(ts){
     const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
     if(t.x<6){ t.x=6; t.vx*=-1; } if(t.x+t.w>W-6){ t.x=W-6-t.w; t.vx*=-1; }
     if(t.y<6){ t.y=6; t.vy*=-1; } if(t.y+t.h>H*0.9){ t.y=H*0.9-t.h; t.vy*=-1; }
+    const drawY = t.y + wobble; // movimiento “difícil”
     ctx.clearRect(0,0,W,H);
-    ctx.drawImage(t.img, t.x, t.y + wobble, t.w, t.h);
+    ctx.drawImage(t.img, t.x, drawY, t.w, t.h);
   } else { ctx.clearRect(0,0,W,H); }
 
   if(b){
@@ -648,11 +644,7 @@ function onCaught(){
     found.add(currentStop.id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
   }
-  setTimeout(()=>{
-    closeCamera();
-    renderStops(lastDistances);
-    showReward(currentStop?.id);
-  }, 120);
+  setTimeout(()=>{ closeCamera(); renderStops(lastDistances); showReward(currentStop?.id); }, 120);
 }
 
 const rewardModal = document.getElementById('rewardModal');
@@ -667,7 +659,7 @@ function showReward(id){
   rewardImg.src = r.img; rewardUseBtn.href = r.url; rewardModal.style.display = 'flex';
 }
 rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
-rewardModal.querySelector('.backdrop')?.addEventListener('click', ()=> rewardModal.style.display='none');
+rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
 </script>
 </body>
 </html>
