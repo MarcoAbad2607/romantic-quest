@@ -138,7 +138,7 @@
     <img src="models/safety_walk.png" alt="Mantente alerta al caminar" onerror="this.src='data:image/svg+xml;charset=utf8,'+encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'960\' height=\'540\'><rect width=\'100%\' height=\'100%\' fill=\'#222'/><text x=\'50%\' y=\'50%\' fill=\'#fff\' font-size=\'28\' text-anchor=\'middle\'>Mantente alerta al caminar</text></svg>')">
     <div class="inner">
       <h3>¡Mantente alerta al caminar Amor! 🚶‍♀️🚶‍♂️</h3>
-      <p>Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución. Te quiero para mas rato, Armando jaja</p>
+      <p>Te quiero vivo Armando! Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución.</p>
       <div class="flex" style="justify-content:flex-end">
         <button id="safetyOkBtn" class="btn">Entendido, jugar con cuidado</button>
       </div>
@@ -396,6 +396,8 @@ stopsList.addEventListener('click', (e)=>{
   btn.textContent = "¡Capturada!";
   btn.disabled = true;
   renderStops(lastDistances);
+  // Mostrar también el cupón cuando se captura desde el botón (sin mini‑juego)
+  showReward(id);
 });
 
 // Reinicio progreso
@@ -664,11 +666,13 @@ function loop(ts){
 function heartPath(ctx, s){ ctx.beginPath(); ctx.moveTo(0, s*0.6); ctx.bezierCurveTo(-s, -s*0.2, -s*0.9, -s, 0, -s*0.6); ctx.bezierCurveTo(s*0.9, -s, s, -s*0.2, 0, s*0.6); }
 
 function onCaught(){
-  if(currentStop && !found.has(currentStop.id)){
-    found.add(currentStop.id);
+  // Captura el id ANTES de cerrar la cámara para no perderlo
+  const wonId = currentStop?.id;
+  if (wonId && !found.has(wonId)){
+    found.add(wonId);
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
   }
-  setTimeout(()=>{ closeCamera(); renderStops(lastDistances); showReward(currentStop?.id); }, 120);
+  setTimeout(()=>{ closeCamera(); renderStops(lastDistances); showReward(wonId); }, 120);
 }
 
 // Confirmación para atrapar al acercarse
@@ -684,7 +688,7 @@ const rewardImg   = document.getElementById('rewardImg');
 const rewardUseBtn= document.getElementById('rewardUseBtn');
 const rewardCloseBtn = document.getElementById('rewardCloseBtn');
 function showReward(id){
-  const r = REWARDS[id];
+  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#premio" };
   rewardTitle.textContent = r.title; rewardText.textContent  = r.text;
   rewardImg.src = r.img; rewardUseBtn.href = r.url; rewardModal.style.display = 'flex';
 }
