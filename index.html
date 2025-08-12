@@ -17,13 +17,13 @@
     header{padding:16px 20px calc(16px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2}
     h1{margin:0;font-size:18px}
 
-    /* Mapa más grande por defecto */
+    /* Mapa: ocupará toda la pantalla al iniciar juego */
     #map{height:70vh}
 
     .wrap{padding:16px}
     .card{background:var(--card);border:1px solid #242438;border-radius:14px;padding:14px;margin:12px 0}
     .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px;font-weight:600;background:#3a3af6;color:white;cursor:pointer}
+    .btn{appearance:none;border:0;border-radius:10px;padding:12px 16px;font-weight:700;background:#3a3af6;color:white;cursor:pointer}
     .btn.secondary{background:#2a2a39}
     .btn:disabled{opacity:.5;cursor:not-allowed}
     .tag{font-size:12px;padding:4px 8px;border-radius:999px;background:#23233a;color:#cfd3e6}
@@ -78,6 +78,21 @@
     body.is-fs #map{ position:fixed; inset:0; height:100vh!important; width:100vw!important; z-index:9990 }
     body.is-fs .fs-exit{ position:fixed; top:12px; right:12px; z-index:9991; background:#2a2a39; color:#fff; border:0; border-radius:10px; padding:10px 14px; font-weight:600; display:block }
     .fs-exit{display:none}
+
+    /* === PANTALLA INICIAL === */
+    #landingOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:radial-gradient(1200px 600px at 50% 0%, #161624, #0e0e12);z-index:10002}
+    #landingOverlay .title{font-size:32px;font-weight:900;letter-spacing:.5px}
+    #landingOverlay .subtitle{opacity:.85}
+    #landingOverlay .actions{display:flex;gap:10px;flex-wrap:wrap}
+    #landingOverlay .hint{font-size:12px;color:#c9cde0}
+
+    /* === AVISO DE SEGURIDAD (tipo Pokémon GO) === */
+    #safetyOverlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:10003}
+    #safetyOverlay .box{max-width:540px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:18px;overflow:hidden}
+    #safetyOverlay img{display:block;width:100%;height:auto}
+    #safetyOverlay .inner{padding:16px}
+    #safetyOverlay h3{margin:0 0 6px 0}
+    #safetyOverlay p{margin:0 0 12px 0;opacity:.9}
   </style>
 </head>
 <body>
@@ -88,9 +103,34 @@
 <!-- Botón de salida (visible solo en fallback de pantalla completa) -->
 <button id="fsExitBtn" class="fs-exit">Salir de pantalla completa</button>
 
+<!-- LANDING: pantalla inicial -->
+<div id="landingOverlay">
+  <div class="title">Amor GO</div>
+  <div class="subtitle">Una búsqueda con mapas, cámara y sorpresas 💛</div>
+  <div class="actions">
+    <button id="landingStartBtn" class="btn">Iniciar juego</button>
+    <button id="landingHowBtn" class="btn secondary">¿Cómo se juega?</button>
+  </div>
+  <div class="hint">Se solicitarán permisos de ubicación y cámara al comenzar.</div>
+</div>
+
+<!-- AVISO DE SEGURIDAD tipo "¡Ten cuidado al caminar!" -->
+<div id="safetyOverlay">
+  <div class="box">
+    <img src="models/safety_walk.png" alt="Mantente alerta al caminar" onerror="this.src='data:image/svg+xml;charset=utf8,'+encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'960\' height=\'540\'><rect width=\'100%\' height=\'100%\' fill=\'#222'/><text x=\'50%\' y=\'50%\' fill=\'#fff\' font-size=\'28\' text-anchor=\'middle\'>Mantente alerta al caminar</text></svg>')">
+    <div class="inner">
+      <h3>¡Mantente alerta al caminar! 🚶‍♀️🚶‍♂️</h3>
+      <p>Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución.</p>
+      <div class="flex" style="justify-content:flex-end">
+        <button id="safetyOkBtn" class="btn">Entendido, jugar con cuidado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="map"></div>
 
-<div class="wrap">
+<div class="wrap" id="uiPanel">
   <div class="card">
     <div class="grid">
       <div>
@@ -98,7 +138,7 @@
         <div class="footer-note" id="progressText">0 de 0 cartas</div>
       </div>
       <div class="flex">
-        <button id="startBtn" class="btn">Iniciar GPS</button>
+        <button id="startBtn" class="btn" title="Iniciar GPS">Iniciar GPS</button>
         <button id="walkBtn" class="btn secondary" title="Vista tipo caminar">Modo caminata</button>
         <button id="fsBtn" class="btn secondary" title="Pantalla completa">Pantalla completa</button>
         <button id="resetBtn" class="btn secondary" title="Borrar cartas">Reiniciar</button>
@@ -326,7 +366,9 @@ stopsList.addEventListener('click', (e)=>{
   renderStops(lastDistances);
 });
 
-document.getElementById('resetBtn').addEventListener('click', ()=>{
+// Reinicio progreso
+const resetBtn = document.getElementById('resetBtn');
+resetBtn.addEventListener('click', ()=>{
   localStorage.removeItem(STORAGE_KEY);
   found = new Set();
   renderStops(lastDistances);
@@ -356,18 +398,18 @@ function applyAvatarMotion(speedMps, bearingDeg){
   }
 }
 
-document.getElementById('walkBtn').addEventListener('click', async ()=>{
+const walkBtn = document.getElementById('walkBtn');
+walkBtn.addEventListener('click', async ()=>{
   walkingMode = !walkingMode;
-  const btn = document.getElementById('walkBtn');
-  btn.textContent = walkingMode ? 'Modo caminata: ON' : 'Modo caminata';
+  walkBtn.textContent = walkingMode ? 'Modo caminata: ON' : 'Modo caminata';
   try{
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       const res = await DeviceOrientationEvent.requestPermission();
       if (res !== 'granted') showMsg("Sin permiso de brújula. Usaré dirección de movimiento.");
     }
-  }catch(_){}
-});
+  }catch(_){}}
+);
 
 window.addEventListener('deviceorientation', (e)=>{
   const ios = (typeof e.webkitCompassHeading === 'number') ? e.webkitCompassHeading : null;
@@ -456,6 +498,7 @@ function startGPS(){
     console.warn(err); showMsg("No se pudo obtener tu ubicación. Revisa permisos.");
   }, { enableHighAccuracy:true, maximumAge:1000, timeout:15000 });
 }
+
 document.getElementById('startBtn').addEventListener('click', startGPS);
 
 /* ========= Pantalla completa (con fallback para iOS) ========= */
@@ -660,6 +703,47 @@ function showReward(id){
 }
 rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
 rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
+
+/* ======== NUEVO: Flujo de inicio ======== */
+const landing = document.getElementById('landingOverlay');
+const landingStartBtn = document.getElementById('landingStartBtn');
+const landingHowBtn = document.getElementById('landingHowBtn');
+const safety = document.getElementById('safetyOverlay');
+const safetyOkBtn = document.getElementById('safetyOkBtn');
+const uiPanel = document.getElementById('uiPanel');
+
+// Oculta controles hasta iniciar
+function setPreGameUI(){
+  uiPanel.style.display = 'none';
+  document.getElementById('map').style.height = '100vh'; // el mapa tomará toda la pantalla al jugar
+}
+setPreGameUI();
+
+landingStartBtn.addEventListener('click', async ()=>{
+  // 1) Intento de fullscreen nativo; si no, CSS fallback
+  const ok = enterNativeFullscreen();
+  if (!ok) enterCssFullscreen();
+
+  // 2) Mostrar aviso de seguridad
+  safety.style.display = 'flex';
+});
+
+safetyOkBtn.addEventListener('click', async ()=>{
+  // 3) Cerrar safety, mostrar UI, iniciar GPS
+  safety.style.display = 'none';
+  landing.style.display = 'none';
+  uiPanel.style.display = '';
+  startGPS();
+  showMsg('¡Diviértanse! Sigan la ruta hasta la primera carta.');
+});
+
+landingHowBtn.addEventListener('click', ()=>{
+  alert('Cómo se juega:\n1) Presiona "Iniciar juego" y acepta el aviso de seguridad.\n2) Concede permisos de ubicación.\n3) Camina hacia las paradas (círculos azules).\n4) Cuando estés dentro del radio, abre la cámara y lanza la bola para atrapar la carta.\n5) Junta todas las cartas para revelar la sorpresa final.');
+});
+
+// Cerrar cámara
+closeCam.addEventListener('click', closeCamera);
+throwHintBtn.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia la carta. Si fallas, intenta con otra dirección.'));
 </script>
 </body>
 </html>
