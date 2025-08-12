@@ -684,7 +684,7 @@ const rewardImg   = document.getElementById('rewardImg');
 const rewardUseBtn= document.getElementById('rewardUseBtn');
 const rewardCloseBtn = document.getElementById('rewardCloseBtn');
 function showReward(id){
-  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#premio" };
+  const r = REWARDS[id];
   rewardTitle.textContent = r.title; rewardText.textContent  = r.text;
   rewardImg.src = r.img; rewardUseBtn.href = r.url; rewardModal.style.display = 'flex';
 }
