@@ -86,6 +86,11 @@
     #landingOverlay .actions{display:flex;gap:10px;flex-wrap:wrap}
     #landingOverlay .hint{font-size:12px;color:#c9cde0}
 
+    /* Caja de instrucciones en landing */
+    #landingOverlay .howBox{max-width:720px;margin:0 16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:14px}
+    #landingOverlay .howBox h3{margin:0 0 6px 0}
+    #landingOverlay .howBox ol{margin:6px 0 0 18px; padding:0}
+
     /* === AVISO DE SEGURIDAD (tipo Pokémon GO) === */
     #safetyOverlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:10003}
     #safetyOverlay .box{max-width:540px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:18px;overflow:hidden}
@@ -107,9 +112,20 @@
 <div id="landingOverlay">
   <div class="title">Amor GO</div>
   <div class="subtitle">Una búsqueda con mapas, cámara y sorpresas 💛</div>
+
+  <div class="howBox">
+    <h3>Cómo se juega</h3>
+    <ol>
+      <li>Presiona <strong>Iniciar juego</strong> y acepta el aviso de seguridad.</li>
+      <li>Concede permisos de <strong>ubicación</strong> y camina hacia las paradas.</li>
+      <li>Cuando estés dentro del radio, el juego te sugerirá <strong>atrapar la carta</strong>.</li>
+      <li>Junta todas las cartas para revelar la <strong>sorpresa final</strong>.</li>
+    </ol>
+    <div id="routePreview" class="footer-note" style="margin-top:10px"></div>
+  </div>
+
   <div class="actions">
     <button id="landingStartBtn" class="btn">Iniciar juego</button>
-    <button id="landingHowBtn" class="btn secondary">¿Cómo se juega?</button>
   </div>
   <div class="hint">Se solicitarán permisos de ubicación y cámara al comenzar.</div>
 </div>
@@ -193,15 +209,15 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
-  { id:"cafe", lat: 20.5935, lng: -100.3923, radius: 50000,
+  { id:"cafe",   name:"Plaza Puerta la Victoria", lat: 20.5935, lng: -100.3923, radius: 120,
     title:"Nuestra primera charla ☕",
     message:"Aquí comenzó a escribirse esta historia. Gracias por ese café y por tu risa.",
     camImg:"models/carta1.png" },
-  { id:"parque", lat: 20.6008, lng: -100.3890, radius: 50000,
+  { id:"parque", name:"Alameda Hidalgo", lat: 20.6008, lng: -100.3890, radius: 120,
     title:"El parque de las risas 🌳",
     message:"Prometo más caminatas, más chistes malos y más fotos robadas tuyas.",
     camImg:"models/carta2.png" },
-  { id:"cine", lat: 20.5871, lng: -100.3899, radius: 50000,
+  { id:"cine",   name:"Centro Histórico", lat: 20.5871, lng: -100.3899, radius: 120,
     title:"Butacas cómplices 🎬",
     message:"La película fue buena, pero tu mano en la mía fue mejor.",
     camImg:"models/carta3.png" }
@@ -346,6 +362,14 @@ function renderStops(distanceMap = {}) {
 }
 renderStops();
 
+// Texto de ruta ordenada en landing
+function buildRoutePreview(){
+  const list = STOPS.map((s, i)=> `${i+1}ª Parada: ${s.name || s.title}`).join(' · ');
+  const el = document.getElementById('routePreview');
+  if (el) el.textContent = `Ruta de hoy: ${list}`;
+}
+buildRoutePreview();
+
 /* ========= eventos lista ========= */
 stopsList.addEventListener('click', (e)=>{
   const camBtn = e.target.closest('button[data-cam]');
@@ -382,6 +406,7 @@ let myMarker = null;
 let walkingMode = false;
 let lastPos = null;
 let headingFromCompass = null;
+let promptedNear = new Set(); // para no spamear avisos cerca de cada parada
 
 // Animación/rotación del avatar según velocidad y rumbo
 function applyAvatarMotion(speedMps, bearingDeg){
@@ -442,6 +467,19 @@ function updateDistances(pos){
   // Distancias + UI
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d; renderStops(d);
+
+  // Aviso automático al estar cerca
+  STOPS.forEach(s=>{
+    const inside = d[s.id] != null && d[s.id] <= s.radius;
+    if (inside && !found.has(s.id) && !promptedNear.has(s.id)){
+      promptedNear.add(s.id);
+      askCatchConfirm(s);
+    }
+    // Resetear aviso si se aleja (histeresis)
+    if (!inside && promptedNear.has(s.id) && d[s.id] > s.radius * 1.2){
+      promptedNear.delete(s.id);
+    }
+  });
 
   // Ruta hacia la siguiente parada
   const next = getNextStop();
@@ -690,6 +728,16 @@ function onCaught(){
   setTimeout(()=>{ closeCamera(); renderStops(lastDistances); showReward(currentStop?.id); }, 120);
 }
 
+// Confirmación para atrapar al acercarse
+function askCatchConfirm(stop){
+  const text = `Estás cerca de "${stop.name || stop.title}". ¿Quieres atrapar la carta ahora?`;
+  if (confirm(text)){
+    openCamera(stop);
+  } else {
+    showMsg('Puedes abrir la cámara desde la lista cuando quieras.');
+  }
+}
+
 const rewardModal = document.getElementById('rewardModal');
 const rewardTitle = document.getElementById('rewardTitle');
 const rewardText  = document.getElementById('rewardText');
@@ -707,7 +755,6 @@ rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModa
 /* ======== NUEVO: Flujo de inicio ======== */
 const landing = document.getElementById('landingOverlay');
 const landingStartBtn = document.getElementById('landingStartBtn');
-const landingHowBtn = document.getElementById('landingHowBtn');
 const safety = document.getElementById('safetyOverlay');
 const safetyOkBtn = document.getElementById('safetyOkBtn');
 const uiPanel = document.getElementById('uiPanel');
@@ -734,16 +781,9 @@ safetyOkBtn.addEventListener('click', async ()=>{
   landing.style.display = 'none';
   uiPanel.style.display = '';
   startGPS();
-  showMsg('¡Diviértanse! Sigan la ruta hasta la primera carta.');
+  const firstRoute = STOPS.map((s,i)=> `${i+1}) ${s.name || s.title}`).join('  ');
+  showMsg(`Paradas: ${firstRoute}`, 6000);
 });
-
-landingHowBtn.addEventListener('click', ()=>{
-  alert('Cómo se juega:\n1) Presiona "Iniciar juego" y acepta el aviso de seguridad.\n2) Concede permisos de ubicación.\n3) Camina hacia las paradas (círculos azules).\n4) Cuando estés dentro del radio, abre la cámara y lanza la bola para atrapar la carta.\n5) Junta todas las cartas para revelar la sorpresa final.');
-});
-
-// Cerrar cámara
-closeCam.addEventListener('click', closeCamera);
-throwHintBtn.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia la carta. Si fallas, intenta con otra dirección.'));
 </script>
 </body>
 </html>
