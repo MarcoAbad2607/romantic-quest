@@ -120,8 +120,8 @@
     <ol>
       <li>Presiona <strong>Iniciar juego</strong> y acepta el aviso de seguridad.</li>
       <li>Concede permisos de <strong>ubicación</strong> y camina hacia las paradas.</li>
-      <li>Cuando estés dentro del radio, el juego te sugerirá <strong>atrapar la carta</strong>.</li>
-      <li>Junta todas las cartas para revelar la <strong>sorpresa final</strong>.</li>
+      <li>Cuando estés dentro del radio, el juego te sugerirá <strong>atrapar el regalo</strong>.</li>
+      <li>Junta todas las regalos para revelar la <strong>sorpresa final</strong>.</li>
     </ol>
     <div id="routePreview" class="footer-note" style="margin-top:10px"></div>
   </div>
@@ -153,13 +153,13 @@
     <div class="grid">
       <div>
         <div class="big">Progreso</div>
-        <div class="footer-note" id="progressText">0 de 0 cartas</div>
+        <div class="footer-note" id="progressText">0 de 0 regalos</div>
       </div>
       <div class="flex">
         <button id="startBtn" class="btn" title="Iniciar GPS">Iniciar GPS</button>
         <button id="walkBtn" class="btn secondary" title="Vista tipo caminar">Modo caminata</button>
         <button id="fsBtn" class="btn secondary" title="Pantalla completa">Pantalla completa</button>
-        <button id="resetBtn" class="btn secondary" title="Borrar cartas">Reiniciar</button>
+        <button id="resetBtn" class="btn secondary" title="Borrar regalos">Reiniciar</button>
       </div>
     </div>
     <div class="progress" style="margin-top:10px"><div id="bar" class="bar"></div></div>
@@ -186,7 +186,7 @@
     <button id="closeCam">Cerrar</button>
     <button id="throwHintBtn">¿Cómo lanzar?</button>
   </div>
-  <div id="camHint">Toca cerca de la bola y desliza hacia la carta para lanzarla ❤️</div>
+  <div id="camHint">Toca cerca de la bola y desliza hacia el regalo para lanzarla ❤️</div>
 </div>
 
 <!-- avisos -->
@@ -214,24 +214,24 @@ const STOPS = [
   { id:"plaza",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 120,
     title:"Cine 🎬 ",
     message:"Aquí es donde me empece a enamorar. Gracias por esta salida.",
-    camImg:"models/carta1.png" },
+    camImg:"models/regalo1.png" },
   { id:"alameda", name:"Alameda", lat: 20.5866, lng: -100.3873, radius: 50000,
     title:"El parque de las risas 🌳",
     message:"Prometo más salidas como esta.",
-    camImg:"models/carta2.png" },
+    camImg:"models/regalo2.png" },
   { id:"maniatica",   name:"Maniatica", lat: 20.5929, lng: -100.3921, radius: 120,
     title:"Nuestra primer cita ☕",
     message:"Perdon por decir eso ese dia, espero esto lo compence jaja.",
-    camImg:"models/carta3.png" }
+    camImg:"models/regalo3.png" }
 ];
 
 const FINAL_DESTINATION = {
   lat: 20.6465, lng: -100.3564,
-  text: "Has reunido todas las cartas. Hay una última sorpresa esperando por ti… ¿Vienes? 💛",
+  text: "Has reunido todos los regalos. Hay una última sorpresa esperando por ti… ¿Vienes? 💛",
   linkText: "Navegar al destino final",
 };
 
-// Cupón único por carta atrapada (copy personalizado)
+// Cupón único por regalo atrapado (copy personalizado)
 const REWARDS = {
   plaza:   { title:"Cupón de café ☕", text:"Vale por un café juntos en Puerta la Victoria. (Solo válido con besos incluidos)", img:"models/cupon_plaza.png", url:"#plaza" },
   alameda: { title:"Cupón roles 🌳", text:"Vale por roles de canela: comprados o preparados por mí.", img:"models/cupon_alameda.png", url:"#alameda" },
@@ -339,20 +339,20 @@ function renderStops(distanceMap = {}) {
       <div>
         <div><strong>${s.title}</strong></div>
         <div class="meta">Radio: ${s.radius} m · ${d!=null?`Distancia: ${fmtMeters(d)}`:""}</div>
-        <div class="meta">${isFound ? "✅ Carta atrapada" : "Pendiente"}</div>
+        <div class="meta">${isFound ? "✅ regalo atrapado" : "Pendiente"}</div>
         ${isFound ? `<div class="pill">${s.message}</div>` : ""}
       </div>
       <div class="btns">
         ${camBtn}
         <button data-id="${s.id}" class="btn" ${isFound || !canCatch ? "disabled":""}>
-          Atrapar carta
+          Atrapar regalo
         </button>
       </div>`;
     stopsList.appendChild(div);
   });
 
   const got = found.size, total = STOPS.length;
-  document.getElementById('progressText').textContent = `${got} de ${total} cartas`;
+  document.getElementById('progressText').textContent = `${got} de ${total} regalos`;
   document.getElementById('bar').style.width = (total? (100*got/total):0) + "%";
 
   const showFinal = (found.size === STOPS.length);
@@ -565,7 +565,7 @@ function loadImage(src){
   return new Promise((resolve)=>{
     const im=new Image();
     im.onload=()=>resolve(im);
-    im.onerror=()=>{ console.warn("No se pudo cargar imagen:", src); showMsg("No se encontró la carta: " + src); const ph=new Image(); ph.onload=()=>resolve(ph); ph.src=placeholderDataURL; };
+    im.onerror=()=>{ console.warn("No se pudo cargar imagen:", src); showMsg("No se encontró el regalo: " + src); const ph=new Image(); ph.onload=()=>resolve(ph); ph.src=placeholderDataURL; };
     im.src=src;
   });
 }
@@ -588,7 +588,7 @@ async function openCamera(stop){
 
   resizeCanvas(); window.addEventListener('resize', resizeCanvas);
 
-  const cardImg = await loadImage(stop.camImg || "models/carta1.png");
+  const cardImg = await loadImage(stop.camImg || "models/regalo1.png");
   const cardW = Math.min(W*0.42, 320), cardH = cardW*1.5;
   const speed = rand(DIFFICULTY.cardSpeedMin, DIFFICULTY.cardSpeedMax);
   const angle = rand(0, Math.PI*2);
@@ -677,7 +677,7 @@ function onCaught(){
 
 // Confirmación para atrapar al acercarse
 function askCatchConfirm(stop){
-  const text = `Estás cerca de "${stop.name || stop.title}". ¿Quieres atrapar la carta ahora?`;
+  const text = `Estás cerca de "${stop.name || stop.title}". ¿Quieres atrapar el regalo ahora?`;
   if (confirm(text)) openCamera(stop); else showMsg('Puedes abrir la cámara desde la lista cuando quieras.');
 }
 
@@ -752,7 +752,7 @@ safetyOkBtn.addEventListener('click', ()=>{
 const closeCamBtn = document.getElementById('closeCam');
 closeCamBtn.addEventListener('click', closeCamera);
 const throwHintBtn2 = document.getElementById('throwHintBtn');
-throwHintBtn2.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia la carta. Si fallas, intenta con otra dirección.'));
+throwHintBtn2.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia el regalo. Si fallas, intenta con otra dirección.'));
 
 // Extra: muestra errores JS en pantalla
 window.addEventListener('error', (e)=>{ try{ showMsg('JS: ' + (e.message||'error')); }catch(_){ console.log(e); } });
