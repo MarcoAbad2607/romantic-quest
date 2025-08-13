@@ -211,15 +211,15 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
-  { id:"cafe",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 50000,
+  { id:"plaza",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 50000,
     title:"Cine 🎬 ",
     message:"Aquí es donde me empece a enamorar. Gracias por esta salida.",
     camImg:"models/carta1.png" },
-  { id:"parque", name:"Alameda", lat: 20.5866, lng: -100.3873, radius: 120,
+  { id:"alameda", name:"Alameda", lat: 20.5866, lng: -100.3873, radius: 50000,
     title:"El parque de las risas 🌳",
     message:"Prometo más salidas como esta.",
     camImg:"models/carta2.png" },
-  { id:"cine",   name:"Maniatica", lat: 20.5929, lng: -100.3921, radius: 120,
+  { id:"maniatica",   name:"Maniatica", lat: 20.5929, lng: -100.3921, radius: 50000,
     title:"Nuestra primer cita ☕",
     message:"Perdon por decir eso ese dia, espero esto lo compence jaja.",
     camImg:"models/carta3.png" }
@@ -233,9 +233,9 @@ const FINAL_DESTINATION = {
 
 // Cupón único por carta atrapada (copy personalizado)
 const REWARDS = {
-  cafe:   { title:"Cupón de café ☕", text:"Vale por un café juntos en Puerta la Victoria. (Solo válido con besos incluidos)", img:"models/cupon_cafe.png", url:"#cafe" },
-  parque: { title:"Cupón picnic 🌳", text:"Vale por picnic en la Alameda: mantita, música y snacks preparados por mí.", img:"models/cupon_picnic.png", url:"#picnic" },
-  cine:   { title:"Cupón cine 🎬", text:"Vale por noche de película en el Centro: tú eliges la cinta, yo invito las palomitas.", img:"models/cupon_cine.png", url:"#cine" }
+  plaza:   { title:"Cupón de café ☕", text:"Vale por un café juntos en Puerta la Victoria. (Solo válido con besos incluidos)", img:"models/cupon_cafe.png", url:"#cafe" },
+  alameda: { title:"Cupón picnic 🌳", text:"Vale por picnic en la Alameda: mantita, música y snacks preparados por mí.", img:"models/cupon_picnic.png", url:"#picnic" },
+  maniatica:   { title:"Cupón cine 🎬", text:"Vale por noche de película en el Centro: tú eliges la cinta, yo invito las palomitas.", img:"models/cupon_cine.png", url:"#cine" }
 };
 
 const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFreq: 2.2 };
