@@ -104,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Amor GO ✨</h1>
+  <h1>Armando GO ✨</h1>
 </header>
 
 <!-- Botón de salida (visible solo en fallback de pantalla completa) -->
@@ -688,9 +688,41 @@ const rewardImg   = document.getElementById('rewardImg');
 const rewardUseBtn= document.getElementById('rewardUseBtn');
 const rewardCloseBtn = document.getElementById('rewardCloseBtn');
 function showReward(id){
-  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#premio" };
-  rewardTitle.textContent = r.title; rewardText.textContent  = r.text;
-  rewardImg.src = r.img; rewardUseBtn.href = r.url; rewardModal.style.display = 'flex';
+  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png" };
+  rewardTitle.textContent = r.title;
+  rewardText.textContent  = r.text;
+  rewardImg.src = r.img;
+
+  // Preparar descarga del cupón
+  rewardUseBtn.textContent = 'Usar cupón';
+  const filenameFromPath = (p)=>{
+    try{ const clean=p.split('#')[0].split('?')[0]; const name=clean.substring(clean.lastIndexOf('/')+1)||'cupon.png'; return name; }catch(_){ return 'cupon.png'; }
+  };
+  const defaultName = filenameFromPath(r.img) || `cupon_${id||'amor'}.png`;
+  rewardUseBtn.href = r.img; // por si el navegador soporta download nativo
+  rewardUseBtn.setAttribute('download', defaultName);
+  rewardUseBtn.onclick = async (ev)=>{
+    ev.preventDefault();
+    try{
+      const res = await fetch(r.img, {cache:'no-cache'});
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = defaultName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=> URL.revokeObjectURL(url), 1200);
+      showMsg('Cupón descargado 📥');
+    }catch(err){
+      console.error('No se pudo descargar, abriendo imagen:', err);
+      window.open(r.img, '_blank');
+      showMsg('Abriendo el cupón… si no se descarga, guarda la imagen manualmente.');
+    }
+  };
+
+  rewardModal.style.display = 'flex';
 }
 rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
 rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
