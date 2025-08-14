@@ -135,7 +135,7 @@
 <!-- AVISO DE SEGURIDAD tipo "¡Ten cuidado al caminar!" -->
 <div id="safetyOverlay">
   <div class="box">
-    <img src="models/safety_walk.png" alt="Mantente alerta al caminar" onerror="this.src='data:image/svg+xml;charset=utf8,'+encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'960\' height=\'540\'><rect width=\'100%\' height=\'100%\' fill=\'#222\'/><text x=\'50%\' y=\'50%\' fill=\'#fff\' font-size=\'28\' text-anchor=\'middle\'>Mantente alerta al caminar</text></svg>')">
+    <img src="models/safety_walk.png" alt="Mantente alerta al caminar" onerror="this.src='data:image/svg+xml;charset=utf8,'+encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'960\' height=\'540\'><rect width=\'100%\' height=\'100%\' fill=\'#222'/><text x=\'50%\' y=\'50%\' fill=\'#fff\' font-size=\'28\' text-anchor=\'middle\'>Mantente alerta al caminar</text></svg>')">
     <div class="inner">
       <h3>¡Mantente alerta al caminar Amor! 🚶‍♀️🚶‍♂️</h3>
       <p>Te quiero vivo Armando! Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución.</p>
@@ -173,19 +173,19 @@
     <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
   </div>
 
-  <!-- NUEVO: Galería de cupones -->
-  <div id="galleryCard" class="card" style="display:none;">
-    <div class="grid">
-      <div>
-        <div class="big">Mis cupones</div>
-        <div class="footer-note" id="galleryInfo">0 guardados</div>
-      </div>
-      <div class="btns">
-        <button id="clearGalleryBtn" class="btn secondary" title="Borrar todos">Borrar todo</button>
-      </div>
-    </div>
-    <div id="galleryList" style="margin-top:10px; display:grid; gap:10px;"></div>
-  </div>
+									 
+														   
+					  
+		   
+										  
+																   
+			
+						
+																									
+			
+		  
+																				 
+		
 
   <p class="footer-note">
     Tip: si algo no carga, abre con <code>?v=8</code> para forzar recarga (caché).
@@ -214,9 +214,11 @@
     <p id="rewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
     <img id="rewardImg" alt="Premio">
     <div class="row">
-      <a id="rewardUseBtn" class="btn" target="_blank" rel="noopener">Usar cupón</a>
-      <button id="rewardCloseBtn" class="btn secondary">Cerrar</button>
-    </div>
+  <a id="rewardUseBtn" class="btn" target="_blank" rel="noopener">Usar cupón</a>
+  <button id="rewardSavePhotosBtn" class="btn">Guardar en Fotos</button>
+  <button id="rewardCloseBtn" class="btn secondary">Cerrar</button>
+</div>
+
   </div>
 </div>
 
@@ -256,98 +258,98 @@ const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFr
 const STORAGE_KEY = "rqg_progress_v1";
 let found = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
 
-/* ========= GALERÍA DE CUPONES (LOCAL) ========= */
-const GALLERY_KEY = "rqg_coupons_gallery_v1";  // [{id,title,text,dataUrl,savedAt}]
-function loadGallery(){
-  try { return JSON.parse(localStorage.getItem(GALLERY_KEY) || "[]"); }
-  catch{ return []; }
-}
-function saveGallery(arr){
-  localStorage.setItem(GALLERY_KEY, JSON.stringify(arr));
-}
-function blobToDataURL(blob){
-  return new Promise(res=>{
-    const r = new FileReader();
-    r.onload = ()=> res(r.result);
-    r.readAsDataURL(blob);
-  });
-}
-async function saveCouponToGallery(couponId, r){
-  const gal = loadGallery();
-  if (gal.some(x => x.id === couponId)) return; // evita duplicados por id
-  try{
-    const resp = await fetch(r.img, { cache:"no-cache" });
-    const blob = await resp.blob();
-    const dataUrl = await blobToDataURL(blob);
-    gal.push({
-      id: couponId || ("c_"+Date.now()),
-      title: r.title || "Cupón",
-      text: r.text || "",
-      dataUrl,
-      savedAt: new Date().toISOString()
-    });
-    saveGallery(gal);
-    renderGallery();
-    showMsg("Cupón guardado en 'Mis cupones' ❤️");
-  }catch(err){
-    console.error("No se pudo guardar en galería:", err);
-  }
-}
-function renderGallery(){
-  const gal = loadGallery();
-  const card = document.getElementById("galleryCard");
-  const list = document.getElementById("galleryList");
-  const info = document.getElementById("galleryInfo");
-  if (!card || !list || !info) return;
+													 
+																				   
+					   
+																	   
+					 
+ 
+						  
+														 
+ 
+							 
+						   
+							   
+								  
+						  
+	 
+ 
+												
+							
+																		  
+	  
+														  
+								   
+											  
+			  
+										
+								 
+						 
+			  
+									   
+	   
+					 
+					
+													   
+			  
+														  
+   
+ 
+						 
+							
+													  
+													  
+													  
+									  
 
-  info.textContent = `${gal.length} guardado${gal.length===1?"":"s"}`;
-  card.style.display = gal.length ? "block" : "none";
-  list.innerHTML = "";
+																	  
+													 
+					  
 
-  gal.forEach(item => {
-    const wrap = document.createElement("div");
-    wrap.className = "pill";
-    wrap.style.display = "grid";
-    wrap.style.gridTemplateColumns = "80px 1fr auto";
-    wrap.style.alignItems = "center";
-    wrap.style.gap = "10px";
-    wrap.innerHTML = `
-      <img src="${item.dataUrl}" alt="${item.title}" style="width:80px;height:auto;border-radius:8px;border:1px solid #2a2a3a">
-      <div>
-        <div style="font-weight:700">${item.title}</div>
-        <div style="font-size:12px;opacity:.8">${new Date(item.savedAt).toLocaleString()}</div>
-        <div style="font-size:12px;opacity:.9;margin-top:4px">${item.text}</div>
-      </div>
-      <div class="btns" style="flex-direction:column;gap:6px">
-        <a class="btn" href="${item.dataUrl}" download="${(item.title||'cupon').replace(/\s+/g,'_')}.png">Descargar</a>
-        <button class="btn secondary" data-del="${item.id}">Eliminar</button>
-      </div>
-    `;
-    list.appendChild(wrap);
-  });
+					   
+											   
+							
+								
+													 
+									 
+							
+					  
+																															   
+		   
+														
+																							   
+																				
+			
+															  
+																													   
+																			 
+			
+	  
+						   
+	 
 
-  // Delegación para eliminar uno
-  list.onclick = (e)=>{
-    const btn = e.target.closest("button[data-del]");
-    if (!btn) return;
-    const id = btn.getAttribute("data-del");
-    const updated = loadGallery().filter(x => x.id !== id);
-    saveGallery(updated);
-    renderGallery();
-  };
-}
-// Botón "Borrar todo"
-const clearBtn = document.getElementById("clearGalleryBtn");
-if (clearBtn) {
-  clearBtn.addEventListener("click", ()=>{
-    if (confirm("¿Borrar todos los cupones guardados?")) {
-      saveGallery([]);
-      renderGallery();
-    }
-  });
-}
-// Render inicial
-renderGallery();
+								  
+					   
+													 
+					 
+											
+														   
+						 
+					
+	
+ 
+					   
+															
+			   
+										  
+														   
+					  
+					  
+	 
+	 
+ 
+				 
+				
 
 /* ========= UTILIDADES ========= */
 function showMsg(text, ms=3200){
@@ -422,14 +424,14 @@ function getNextStop(){ for (const s of STOPS) if (!found.has(s.id)) return s; r
 async function fetchAndDrawRoute(fromLngLat, toLngLat){
   if (!toLngLat) return;
   const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`;
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.routes && data.routes[0]){
-      const gj = { type:'FeatureCollection', features:[{ type:'Feature', geometry:data.routes[0].geometry, properties:{} }] };
-      drawRoute(gj);
-    }
-  } catch(e){ console.warn('No se pudo obtener la ruta', e); }
+	  
+								 
+  try{ const res = await fetch(url); const data = await res.json();
+									   
+    if (data.routes && data.routes[0]){ const gj = { type:'FeatureCollection', features:[{ type:'Feature', geometry:data.routes[0].geometry, properties:{} }] }; drawRoute(gj);} }
+					
+	 
+  catch(e){ console.warn('No se pudo obtener la ruta', e); }
 }
 
 /* ========= UI de paradas ========= */
@@ -508,9 +510,17 @@ stopsList.addEventListener('click', (e)=>{
   btn.textContent = "¡Capturada!";
   btn.disabled = true;
   renderStops(lastDistances);
-  // Mostrar también el cupón cuando se captura desde el botón (sin mini-juego)
+  // Mostrar también el cupón cuando se captura desde el botón (sin mini‑juego)
   showReward(id);
 });
+
+const rewardSavePhotosBtn = document.getElementById('rewardSavePhotosBtn');
+
+// nombre sugerido del archivo (ya lo calculas arriba)
+rewardSavePhotosBtn.onclick = async (ev)=>{
+  ev.preventDefault();
+  await saveImageToPhotos(r, defaultName);
+};
 
 // Reinicio progreso
 const resetBtn = document.getElementById('resetBtn');
@@ -534,13 +544,13 @@ function applyAvatarMotion(speedMps, bearingDeg){
   const img = myMarker?.getElement().querySelector('.avatar');
   if (!img) return;
   if (typeof bearingDeg === 'number') img.style.setProperty('--rot', `${bearingDeg}deg`);
-  if (speedMps > 0.6) {
-    img.classList.add('walk'); img.classList.remove('idle');
-    const step = Math.max(260, Math.min(700, 1200/(speedMps + 0.5)));
-    img.style.setProperty('--stepDur', `${Math.round(step)}ms`);
-  } else {
-    img.classList.add('idle'); img.classList.remove('walk'); img.style.removeProperty('--stepDur');
-  }
+  if (speedMps > 0.6) { img.classList.add('walk'); img.classList.remove('idle'); const step = Math.max(260, Math.min(700, 1200/(speedMps + 0.5))); img.style.setProperty('--stepDur', `${Math.round(step)}ms`); }
+															
+																	 
+																
+		  
+  else { img.classList.add('idle'); img.classList.remove('walk'); img.style.removeProperty('--stepDur'); }
+   
 }
 
 const walkBtn = document.getElementById('walkBtn');
@@ -552,8 +562,8 @@ walkBtn.addEventListener('click', async ()=>{
       const res = await DeviceOrientationEvent.requestPermission();
       if (res !== 'granted') showMsg("Sin permiso de brújula. Usaré dirección de movimiento.");
     }
-  }catch(_){}
-});
+  }catch(_){}}
+);
 
 window.addEventListener('deviceorientation', (e)=>{
   const ios = (typeof e.webkitCompassHeading === 'number') ? e.webkitCompassHeading : null;
@@ -660,11 +670,11 @@ function exitCssFullscreen(){ document.body.classList.remove('is-fs'); fsExitBtn
 fsBtn.addEventListener('click', ()=>{ const ok = enterNativeFullscreen(); if (!ok) enterCssFullscreen(); });
 fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
 ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
-  document.addEventListener(ev, ()=>{
-    const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-    if (inFs){ fsExitBtn.style.display = 'none'; map.resize(); }
-    else { exitCssFullscreen(); }
-  });
+									 
+  document.addEventListener(ev, ()=>{ const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement); if (inFs){ fsExitBtn.style.display = 'none'; map.resize(); } else { exitCssFullscreen(); } });
+																
+								 
+	 
 });
 
 /* ========= CÁMARA + MINI-JUEGO ========= */
@@ -802,7 +812,7 @@ function askCatchConfirm(stop){
   if (confirm(text)) openCamera(stop); else showMsg('Puedes abrir la cámara desde la lista cuando quieras.');
 }
 
-/* ========= MODAL DE CUPÓN ========= */
+										 
 const rewardModal = document.getElementById('rewardModal');
 const rewardTitle = document.getElementById('rewardTitle');
 const rewardText  = document.getElementById('rewardText');
@@ -810,23 +820,54 @@ const rewardImg   = document.getElementById('rewardImg');
 const rewardUseBtn= document.getElementById('rewardUseBtn');
 const rewardCloseBtn = document.getElementById('rewardCloseBtn');
 
+async function saveImageToPhotos(r, defaultName){
+  try{
+    // Descargar la imagen del cupón
+    const resp = await fetch(r.img, { cache: "no-cache" });
+    const blob = await resp.blob();
+    const fileType = blob.type || "image/png";
+    const file = new File([blob], defaultName || "cupon.png", { type: fileType });
+
+    // ¿El navegador puede compartir archivos?
+    const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    if (canShareFiles){
+      await navigator.share({
+        files: [file],
+        title: r.title || "Cupón",
+        text: r.text || ""
+      });
+      // Si el usuario cierra la hoja sin guardar, no hay error; solo no hace nada.
+      showMsg('En la hoja de iOS toca "Guardar imagen" para enviarla a tu galería.');
+    } else {
+      // Fallback: abrir la imagen para que la guarden manualmente
+      window.open(r.img, "_blank");
+      showMsg('Tu navegador no permite enviar a Fotos. Abre y toca Compartir → Guardar imagen.');
+    }
+  }catch(err){
+    console.error("No se pudo abrir la hoja de compartir:", err);
+    window.open(r.img, "_blank");
+    showMsg('No se pudo lanzar compartir. Abriendo imagen para que puedas guardarla.');
+  }
+}
+
+
 function showReward(id){
-  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#cup" };
+  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png" };
   rewardTitle.textContent = r.title;
   rewardText.textContent  = r.text;
   rewardImg.src = r.img;
 
-  // Guardar AUTOMÁTICAMENTE en la galería interna de la app
-  saveCouponToGallery(id, r);
+															  
+							 
 
-  // Preparar descarga (cuando el usuario toque "Usar cupón")
+  // Preparar descarga del cupón
   rewardUseBtn.textContent = 'Usar cupón';
   const filenameFromPath = (p)=>{
     try{ const clean=p.split('#')[0].split('?')[0]; const name=clean.substring(clean.lastIndexOf('/')+1)||'cupon.png'; return name; }catch(_){ return 'cupon.png'; }
   };
   const defaultName = filenameFromPath(r.img) || `cupon_${id||'amor'}.png`;
 
-  rewardUseBtn.href = r.img; // intento nativo por atributo download
+  rewardUseBtn.href = r.img; // por si el navegador soporta download nativo
   rewardUseBtn.setAttribute('download', defaultName);
 
   rewardUseBtn.onclick = async (ev)=>{
@@ -876,13 +917,13 @@ safetyOkBtn.addEventListener('click', ()=>{
   showMsg(`Paradas: ${firstRoute}`, 6000);
 });
 
-// Ayuda y cierre cámara
-														
-closeCam.addEventListener('click', closeCamera);
-															  
-throwHintBtn.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia el regalo. Si fallas, intenta con otra dirección.'));
+// Ayuda
+const closeCamBtn = document.getElementById('closeCam');
+closeCamBtn.addEventListener('click', closeCamera);
+const throwHintBtn2 = document.getElementById('throwHintBtn');
+throwHintBtn2.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia el regalo. Si fallas, intenta con otra dirección.'));
 
- // Extra: muestra errores JS en pantalla
+// Extra: muestra errores JS en pantalla
 window.addEventListener('error', (e)=>{ try{ showMsg('JS: ' + (e.message||'error')); }catch(_){ console.log(e); } });
 </script>
 </body>
