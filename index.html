@@ -145,7 +145,8 @@
   </div>
 
   <div class="actions">
-    <button id="landingStartBtn" class="btn">Iniciar juego</button>
+    <!-- Respaldo onclick por si el listener no se engancha -->
+    <button id="landingStartBtn" class="btn" type="button" onclick="window.__startGame && window.__startGame()">Iniciar juego</button>
   </div>
   <div class="hint">Se solicitarán permisos de ubicación y cámara al comenzar.</div>
 </div>
@@ -159,7 +160,7 @@
       <h3>¡Mantente alerta al caminar Amor! 🚶‍♀️🚶‍♂️</h3>
       <p>Te quiero vivo Armando. Presta atención a tu entorno. No uses el teléfono en vías, escaleras o al cruzar calles. Juega con precaución.</p>
       <div class="row">
-        <button id="safetyOkBtn" class="btn">Entendido, jugar con cuidado</button>
+        <button id="safetyOkBtn" class="btn" type="button">Entendido, jugar con cuidado</button>
       </div>
     </div>
   </div>
@@ -175,10 +176,10 @@
         <div class="footer-note" id="progressText">0 de 0 regalos</div>
       </div>
       <div class="flex">
-        <button id="startBtn" class="btn" title="Iniciar GPS">Iniciar GPS</button>
-        <button id="walkBtn" class="btn secondary" title="Vista tipo caminar">Modo caminata</button>
-        <button id="fsBtn" class="btn secondary" title="Pantalla completa">Pantalla completa</button>
-        <button id="resetBtn" class="btn secondary" title="Borrar regalos">Reiniciar</button>
+        <button id="startBtn" class="btn" title="Iniciar GPS" type="button">Iniciar GPS</button>
+        <button id="walkBtn" class="btn secondary" title="Vista tipo caminar" type="button">Modo caminata</button>
+        <button id="fsBtn" class="btn secondary" title="Pantalla completa" type="button">Pantalla completa</button>
+        <button id="resetBtn" class="btn secondary" title="Borrar regalos" type="button">Reiniciar</button>
       </div>
     </div>
     <div class="progress" style="margin-top:10px"><div id="bar" class="bar"></div></div>
@@ -200,14 +201,14 @@
         <div class="footer-note" id="galleryInfo">0 guardados</div>
       </div>
       <div class="btns">
-        <button id="clearGalleryBtn" class="btn secondary" title="Borrar todos">Borrar todo</button>
+        <button id="clearGalleryBtn" class="btn secondary" title="Borrar todos" type="button">Borrar todo</button>
       </div>
     </div>
     <div id="galleryList" style="margin-top:10px; display:grid; gap:10px;"></div>
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=12</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=13</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -216,8 +217,8 @@
   <video id="camVideo" autoplay playsinline muted></video>
   <canvas id="camCanvas"></canvas>
   <div id="camTopBar">
-    <button id="closeCam">Cerrar</button>
-    <button id="throwHintBtn">¿Cómo lanzar?</button>
+    <button id="closeCam" type="button">Cerrar</button>
+    <button id="throwHintBtn" type="button">¿Cómo lanzar?</button>
   </div>
   <div id="camHint">Toca cerca de la bola y desliza hacia el regalo para lanzarla ❤️</div>
 </div>
@@ -233,7 +234,7 @@
     <div class="place" id="storyPlace"></div>
     <p class="msg" id="storyText"></p>
     <div class="row">
-      <button id="storyContinueBtn" class="btn">Ver cupón</button>
+      <button id="storyContinueBtn" class="btn" type="button">Ver cupón</button>
     </div>
   </div>
 </div>
@@ -246,8 +247,8 @@
     <p id="rewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
     <img id="rewardImg" alt="Premio">
     <div class="row">
-      <button id="rewardSavePhotosBtn" class="btn">Guardar cupón</button>
-      <button id="rewardCloseBtn" class="btn secondary">Cerrar</button>
+      <button id="rewardSavePhotosBtn" class="btn" type="button">Guardar cupón</button>
+      <button id="rewardCloseBtn" class="btn secondary" type="button">Cerrar</button>
     </div>
   </div>
 </div>
@@ -261,8 +262,8 @@
       Encontré progreso previo. ¿Quieres continuar o empezar desde cero?
     </p>
     <div class="row">
-      <button id="resumeContinueBtn" class="btn">Continuar</button>
-      <button id="resumeResetBtn" class="btn secondary">Empezar de cero</button>
+      <button id="resumeContinueBtn" class="btn" type="button">Continuar</button>
+      <button id="resumeResetBtn" class="btn secondary" type="button">Empezar de cero</button>
     </div>
   </div>
 </div>
@@ -292,14 +293,12 @@ const FINAL_DESTINATION = {
   linkText: "Navegar al destino final",
 };
 
-// Cupón por regalo
 const REWARDS = {
   plaza:   { title:"Cupón de café ☕", text:"Vale por un café juntos en Puerta la Victoria. (Solo válido con besos incluidos)", img:"models/cupon_plaza.png" },
   alameda: { title:"Cupón roles 🌳", text:"Vale por roles de canela: comprados o preparados por mí.", img:"models/cupon_alameda.png" },
   maniatica:{ title:"Cupón baile 🎬", text:"Vale por una cita a bailar: tú eliges el lugar y el ritmo, yo invito.", img:"models/cupon_maniatica.png" }
 };
 
-// Mensaje post-cupón
 const POST_REWARD_MESSAGES = {
   default: "Amor, ve a recoger un regalito en la siguiente parada 💛",
   plaza: "Listo el primer detalle. ¡Vamos por el siguiente regalito! 🚶",
@@ -356,7 +355,7 @@ function renderGallery(){
       </div>
       <div class="btns" style="flex-direction:column;gap:6px">
         <a class="btn" href="${item.dataUrl}" download="${(item.title||'cupon').replace(/\s+/g,'_')}.png">Descargar</a>
-        <button class="btn secondary" data-del="${item.id}">Eliminar</button>
+        <button class="btn secondary" data-del="${item.id}" type="button">Eliminar</button>
       </div>
     `;
     list.appendChild(wrap);
@@ -513,8 +512,8 @@ function renderStops(distanceMap = {}) {
     const div = document.createElement('div');
     div.className = "card stop" + (isFound ? " found" : "");
     const camBtn = (canCatch && isCurrent)
-      ? `<button class="btn secondary" data-cam="${s.id}">Ver en cámara</button>`
-      : `<button class="btn secondary" disabled title="${!isCurrent ? 'Aún no toca esta parada' : 'Acércate para usar cámara'}">Ver en cámara</button>`;
+      ? `<button class="btn secondary" data-cam="${s.id}" type="button">Ver en cámara</button>`
+      : `<button class="btn secondary" disabled title="${!isCurrent ? 'Aún no toca esta parada' : 'Acércate para usar cámara'}" type="button">Ver en cámara</button>`;
 
     const stateLine = isFound ? "✅ regalo atrapado" : (isCurrent ? "➡️ siguiente objetivo" : "Pendiente");
 
@@ -527,7 +526,7 @@ function renderStops(distanceMap = {}) {
       </div>
       <div class="btns">
         ${camBtn}
-        <button data-id="${s.id}" class="btn" ${isFound || !canCatch || !isCurrent ? "disabled":""}>
+        <button data-id="${s.id}" class="btn" type="button" ${isFound || !canCatch || !isCurrent ? "disabled":""}>
           Atrapar regalo
         </button>
       </div>`;
@@ -722,7 +721,6 @@ fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
 const camOverlay = document.getElementById('camOverlay');
 const camVideo   = document.getElementById('camVideo');
 const camCanvas  = document.getElementById('camCanvas');
-const closeCam   = document.getElementById('closeCam');
 const throwHintBtn = document.getElementById('throwHintBtn');
 
 let camStream = null, currentStop = null;
@@ -1001,8 +999,8 @@ function beginStartFlow(){
   safety.style.display = 'flex';
 }
 
-landingStartBtn.addEventListener('click', ()=>{
-  // Si hay progreso (incluye 3/3), siempre preguntar primero
+/* Función de respaldo para el botón (y usada por el listener) */
+window.__startGame = function(){
   if (found.size > 0){
     resumeModal.dataset.next = 'start';
     resumeText.textContent = (found.size >= STOPS.length)
@@ -1012,7 +1010,9 @@ landingStartBtn.addEventListener('click', ()=>{
     return;
   }
   beginStartFlow();
-});
+};
+
+landingStartBtn.addEventListener('click', window.__startGame);
 
 safetyOkBtn.addEventListener('click', ()=>{
   safety.style.display = 'none';
