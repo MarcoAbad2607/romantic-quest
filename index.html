@@ -618,6 +618,12 @@ function renderStops(distanceMap = {}) {
     );
     const finalUberBtn = document.getElementById('finalUberBtn');
     finalUberBtn.href = uberQuickLink;
+	if (lastPos) {
+  fetchAndDrawRoute(
+    [lastPos.lng, lastPos.lat],
+    [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat]
+  );
+}
   }
 }
 renderStops();
@@ -727,7 +733,7 @@ function updateDistances(pos){
 
   const next = getNextStop();
   const me = [lng, lat];
-  const dest = next ? [next.lng, next.lat] : [FINAL_DESTINATION.lng, FINAL_DESTINATION.lng];
+  const dest = next ? [next.lng, next.lat] : [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat];
   clearTimeout(updateDistances._t);
   updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
 
@@ -1056,7 +1062,7 @@ function showFinalRideModal(){
   finalRideModal.style.display = 'flex';
 }
 
-function showPostRewardMessage(stopId){
+async function showPostRewardMessage(stopId){
   const next = getNextStop();
   if (next){
     let msg = POST_REWARD_MESSAGES[stopId] || POST_REWARD_MESSAGES.default;
