@@ -367,7 +367,7 @@ const FINAL_RIDE = {
     lat: FINAL_DESTINATION.lat,
     lng: FINAL_DESTINATION.lng,
     label: "Destino final 💛",
-    address: "Dirección completa aquí"
+    address: "Lago El Refugio Queretaro"
   }
 };
 
@@ -922,8 +922,8 @@ function loop(ts){
   if(t){
     t.t += dt; t.x += t.vx*dt; t.y += t.vy*dt;
     const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
-    if(t.x<6){ t.x=6; t.vx*=-1; } if(t.x+t.w>W-6){ t.x=W-6-t.w; t.vx*=-1; }
-    if(t.y<6){ t.y=6; t.vy*=-1; } if(t.y+t.h>H*0.9){ t.y=H*0.9-t.h; t.vy*=-1; }
+    if (t.y < 6) { t.y = 6; t.vy *= -1; }
+if (t.y + t.h > H * 0.75) { t.y = H * 0.75 - t.h; t.vy *= -1; }
     const drawY = t.y + wobble;
     ctx.clearRect(0,0,W,H);
     ctx.drawImage(t.img, t.x, drawY, t.w, t.h);
@@ -941,11 +941,23 @@ function loop(ts){
 
   if(game.swipe.active){ ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(game.swipe.sx,game.swipe.sy); ctx.lineTo(game.swipe.ex,game.swipe.ey); ctx.stroke(); }
 
-  if(b && t && b.x>t.x && b.x<t.x+t.w && b.y>t.y && b.y<t.y+t.h){ onCaught(); return; }
+  if (b && t && b.flying && circleRectCollides(b, t)) { 
+  onCaught(); 
+  return; 
+}
   requestAnimationFrame(loop);
 }
 
 function heartPath(ctx, s){ ctx.beginPath(); ctx.moveTo(0, s*0.6); ctx.bezierCurveTo(-s, -s*0.2, -s*0.9, -s, 0, -s*0.6); ctx.bezierCurveTo(s*0.9, -s, s, -s*0.2, 0, s*0.6); }
+
+function circleRectCollides(c, r){
+  // c: {x,y,r}  r: {x,y,w,h}
+  const closestX = Math.max(r.x, Math.min(c.x, r.x + r.w));
+  const closestY = Math.max(r.y, Math.min(c.y, r.y + r.h));
+  const dx = c.x - closestX;
+  const dy = c.y - closestY;
+  return (dx*dx + dy*dy) <= (c.r * c.r);
+}
 
 function onCaught(){
   const wonId = currentStop?.id;
