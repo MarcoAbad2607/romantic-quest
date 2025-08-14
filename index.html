@@ -22,14 +22,13 @@
     }
     h1{margin:0;font-size:18px;color:#f6f7fb}
 
-    /* HUD superior */
+    /* HUD superior (visible también en pantalla completa CSS) */
     .hud{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .hud .chip{background:#1b1b28;border:1px solid #2a2a3a;border-radius:999px;padding:6px 10px;font-size:12px;color:#dfe3f4}
     .hud .link{cursor:pointer;text-decoration:underline}
     .hud .barwrap{width:120px;height:8px;background:#242438;border-radius:999px;overflow:hidden;display:inline-block;vertical-align:middle}
     .hud .bar{height:100%;background:linear-gradient(90deg,#3a3af6,#9a66ff);width:0%}
 
-    /* Mapa */
     #map{height:70vh}
 
     .wrap{padding:16px}
@@ -77,7 +76,7 @@
     .modal .row{display:flex;gap:8px;justify-content:flex-end}
     .modal img{width:100%;border-radius:12px;margin:8px 0}
 
-    /* Story */
+    /* Story modal */
     #storyModal .title{font-size:18px;font-weight:800;margin:0 0 6px}
     #storyModal .place{font-size:12px;opacity:.8;margin:0 0 8px}
     #storyModal .msg{margin:0 0 10px;opacity:.95}
@@ -125,7 +124,6 @@
   </div>
 </header>
 
-<!-- Botón de salida para modo pantalla completa por CSS -->
 <button id="fsExitBtn" class="fs-exit">Salir de pantalla completa</button>
 
 <!-- LANDING -->
@@ -145,7 +143,6 @@
   </div>
 
   <div class="actions">
-    <!-- Respaldo onclick por si el listener no se engancha -->
     <button id="landingStartBtn" class="btn" type="button" onclick="window.__startGame && window.__startGame()">Iniciar juego</button>
   </div>
   <div class="hint">Se solicitarán permisos de ubicación y cámara al comenzar.</div>
@@ -208,7 +205,7 @@
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=13</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=14</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -334,11 +331,9 @@ function renderGallery(){
   const list = document.getElementById("galleryList");
   const info = document.getElementById("galleryInfo");
   if (!card || !list || !info) return;
-
   info.textContent = `${gal.length} guardado${gal.length===1?"":"s"}`;
   card.style.display = gal.length ? "block" : "none";
   list.innerHTML = "";
-
   gal.forEach(item => {
     const wrap = document.createElement("div");
     wrap.className = "pill";
@@ -360,7 +355,6 @@ function renderGallery(){
     `;
     list.appendChild(wrap);
   });
-
   list.onclick = (e)=>{
     const btn = e.target.closest("button[data-del]");
     if (!btn) return;
@@ -381,6 +375,15 @@ if (clearBtn) {
 }
 renderGallery();
 
+/* ========= ESTADO GLOBAL (DECLARADO TEMPRANO: evita TDZ) ========= */
+let watchId = null;
+let lastDistances = {};
+let myMarker = null;
+let walkingMode = false;
+let lastPos = null;            // <-- ahora existe antes de updateTopHUD()
+let headingFromCompass = null;
+let promptedNear = new Set();
+
 /* ========= UTIL ========= */
 function showMsg(text, ms=3200){
   const bar = document.getElementById('msgBar');
@@ -389,7 +392,7 @@ function showMsg(text, ms=3200){
 }
 function fmtMeters(m){ if (m==null) return ""; if (m<1000) return `${Math.round(m)} m`; const km=m/1000; return km>=10?`${Math.round(km)} km`:`${km.toFixed(1)} km`; }
 function haversine(lat1, lon1, lat2, lon2) {
-  const R=6371000, toRad=x=>x*Math.PI/180, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const R=6371000, toRad=x=>x*Math.PI/180, dLat=toRad(lat2-lat1), dLon=toRad(lat2-lon1);
   const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
@@ -398,7 +401,8 @@ function rand(min,max){ return Math.random()*(max-min)+min; }
 /* ========= MAPA ========= */
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/navigation-day-v1',
+  style: 'mapbox://styles/mapbox/navigation-day-v1', // Nota: este estilo intenta cargar "incidents". Los 404 son inofensivos.
+  // Si quieres silenciar esos 404, usa: 'mapbox://styles/mapbox/streets-v12'
   center: [-100.389, 20.595],
   zoom: 15.5,
   pitch: 60,
@@ -406,7 +410,6 @@ const map = new mapboxgl.Map({
   antialias: true
 });
 map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
-
 map.on('style.load', () => { addStopMarkers(); });
 
 function addStopMarkers(){
@@ -423,7 +426,6 @@ function addStopMarkers(){
       .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' }).setHTML(`<div><strong>${s.name || s.title}</strong><div class="popup-sub">${s.title}</div></div>`))
       .addTo(map);
   });
-
   const elf = document.createElement('div');
   elf.className = 'marker marker-final';
   elf.innerHTML = `
@@ -561,7 +563,7 @@ function buildRoutePreview(){
 }
 buildRoutePreview();
 
-/* ========= Lista eventos ========= */
+/* ========= Eventos lista ========= */
 stopsList.addEventListener('click', (e)=>{
   const camBtn = e.target.closest('button[data-cam]');
   if (camBtn){
@@ -589,13 +591,8 @@ stopsList.addEventListener('click', (e)=>{
 });
 
 /* ========= GPS + caminata + avatar ========= */
-let watchId = null;
-let lastDistances = {};
-let myMarker = null;
-let walkingMode = false;
-let lastPos = null;
-let headingFromCompass = null;
-let promptedNear = new Set();
+let myMarkerInit = false;
+const walkBtn = document.getElementById('walkBtn');
 
 function applyAvatarMotion(speedMps, bearingDeg){
   const img = myMarker?.getElement().querySelector('.avatar');
@@ -610,7 +607,6 @@ function applyAvatarMotion(speedMps, bearingDeg){
   }
 }
 
-const walkBtn = document.getElementById('walkBtn');
 walkBtn.addEventListener('click', async ()=>{
   walkingMode = !walkingMode;
   walkBtn.textContent = walkingMode ? 'Modo caminata: ON' : 'Modo caminata';
@@ -645,12 +641,12 @@ function updateDistances(pos){
       .setLngLat([lng, lat]).addTo(map);
 
     map.easeTo({ center:[lng, lat], zoom:16, duration:600 });
+    myMarkerInit = true;
   } else { myMarker.setLngLat([lng, lat]); }
 
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d; renderStops(d);
 
-  // Aviso solo para la parada actual
   const must = getNextStop();
   if (must) {
     const inside = d[must.id] != null && d[must.id] <= must.radius;
@@ -663,7 +659,6 @@ function updateDistances(pos){
     }
   }
 
-  // Ruta: a siguiente parada o al DESTINO FINAL si ya no quedan
   const next = getNextStop();
   const me = [lng, lat];
   const dest = next ? [next.lng, next.lat] : [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat];
@@ -709,7 +704,7 @@ function startGPS(){
 }
 document.getElementById('startBtn').addEventListener('click', startGPS);
 
-/* ========= Pantalla completa (SOLO CSS) ========= */
+/* ========= Pantalla completa (CSS) ========= */
 const fsBtn = document.getElementById('fsBtn');
 const fsExitBtn = document.getElementById('fsExitBtn');
 function enterCssFullscreen(){ document.body.classList.add('is-fs'); fsExitBtn.style.display = 'block'; map.resize(); }
@@ -999,7 +994,7 @@ function beginStartFlow(){
   safety.style.display = 'flex';
 }
 
-/* Función de respaldo para el botón (y usada por el listener) */
+/* Respaldo para botón Iniciar */
 window.__startGame = function(){
   if (found.size > 0){
     resumeModal.dataset.next = 'start';
@@ -1023,7 +1018,7 @@ safetyOkBtn.addEventListener('click', ()=>{
   showMsg(`Paradas: ${firstRoute}`, 6000);
 });
 
-// Reiniciar progreso (botón del panel)
+// Reiniciar progreso
 const resetBtn = document.getElementById('resetBtn');
 resetBtn.addEventListener('click', ()=>{
   localStorage.removeItem(STORAGE_KEY);
@@ -1040,7 +1035,7 @@ throwHintBtn.addEventListener('click', ()=> showMsg('Toca cerca de la bola y des
 // Errores JS en pantalla
 window.addEventListener('error', (e)=>{ try{ showMsg('JS: ' + (e.message||'error')); }catch(_){ console.log(e); } });
 
-/* Llamar al prompt de continuar si había progreso (también aparecerá al tocar Iniciar) */
+/* Prompt de continuar si había progreso */
 maybeOfferResume();
 </script>
 </body>
