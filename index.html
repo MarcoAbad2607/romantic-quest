@@ -320,6 +320,7 @@ function renderGallery(){
         <div style="font-size:12px;opacity:.9;margin-top:4px">${item.text}</div>
       </div>
       <div class="btns" style="flex-direction:column;gap:6px">
+        <a class="btn" href="${item.dataUrl}" download="${(item.title||'cupon').replace(/\s+/g,'_')}.png">Descargar</a>
         <button class="btn secondary" data-del="${item.id}">Eliminar</button>
       </div>
     `;
@@ -820,7 +821,6 @@ const rewardModal = document.getElementById('rewardModal');
 const rewardTitle = document.getElementById('rewardTitle');
 const rewardText  = document.getElementById('rewardText');
 const rewardImg   = document.getElementById('rewardImg');
-const rewardUseBtn= document.getElementById('rewardUseBtn');
 const rewardSavePhotosBtn = document.getElementById('rewardSavePhotosBtn');
 const rewardCloseBtn = document.getElementById('rewardCloseBtn');
 
@@ -865,35 +865,12 @@ function showReward(id){
   saveCouponToGallery(id, r);
 
   // Preparar descarga directa
-  rewardUseBtn.textContent = 'Usar cupón';
   const filenameFromPath = (p)=>{
     try{ const clean=p.split('#')[0].split('?')[0]; const name=clean.substring(clean.lastIndexOf('/')+1)||'cupon.png'; return name; }catch(_){ return 'cupon.png'; }
   };
   const defaultName = filenameFromPath(r.img) || `cupon_${id||'amor'}.png`;
 
-  rewardUseBtn.href = r.img;
-  rewardUseBtn.setAttribute('download', defaultName);
 
-  rewardUseBtn.onclick = async (ev)=>{
-    ev.preventDefault();
-    try{
-      const res = await fetch(r.img, {cache:'no-cache'});
-      const blob = await res.blob();
-      const a = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      a.href = url;
-      a.download = defaultName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=> URL.revokeObjectURL(url), 1200);
-      showMsg('Cupón descargado 📥');
-    }catch(err){
-      console.error('No se pudo descargar, abriendo imagen:', err);
-      window.open(r.img, '_blank');
-      showMsg('Abriendo el cupón… si no se descarga, guarda la imagen manualmente.');
-    }
-  };
 
   // Guardar en Fotos (iOS/soporte Web Share Level 2)
   rewardSavePhotosBtn.onclick = async (ev)=>{
