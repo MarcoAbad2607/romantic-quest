@@ -265,6 +265,18 @@
   </div>
 </div>
 
+<!-- Modal post-cupón -->
+<div id="postRewardModal" class="modal">
+  <div class="backdrop"></div>
+  <div class="content">
+    <h3 style="margin:0 0 8px 0;">Siguiente paso</h3>
+    <p id="postRewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
+    <div class="row">
+      <button id="postRewardCloseBtn" class="btn" type="button">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ========= CONFIG ========= */
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
@@ -869,6 +881,12 @@ const rewardImg   = document.getElementById('rewardImg');
 const rewardSavePhotosBtn = document.getElementById('rewardSavePhotosBtn');
 const rewardCloseBtn = document.getElementById('rewardCloseBtn');
 
+// Post-reward modal
+const postRewardModal = document.getElementById('postRewardModal');
+const postRewardText  = document.getElementById('postRewardText');
+const postRewardCloseBtn = document.getElementById('postRewardCloseBtn');
+
+
 let lastRewardId = null;
 
 function openStoryForStop(stopId, onContinue){
@@ -938,15 +956,26 @@ function showStoryThenReward(stopId){
 }
 function showPostRewardMessage(stopId){
   const next = getNextStop();
+  let msg = POST_REWARD_MESSAGES[stopId] || POST_REWARD_MESSAGES.default;
+
   if (next){
     const d = lastDistances?.[next.id];
-    const msg = POST_REWARD_MESSAGES[stopId] || POST_REWARD_MESSAGES.default;
-    const withNext = d!=null ? `${msg} Siguiente: ${next.name || next.title} (${fmtMeters(d)}).` : `${msg} Siguiente: ${next.name || next.title}.`;
-    showMsg(withNext, 6000);
+    msg += d!=null
+      ? `\n\nSiguiente: ${next.name || next.title} (${fmtMeters(d)}).`
+      : `\n\nSiguiente: ${next.name || next.title}.`;
   } else {
-    showMsg("¡Reuniste todos los regalos! Abre el destino final 💛", 6000);
+    msg = "¡Reuniste todos los regalos! 💛 Abre el destino final.";
   }
+
+  // Mostrar en modal
+  postRewardText.innerText = msg;  // (innerText conserva los saltos de línea)
+  postRewardModal.style.display = 'flex';
 }
+
+// Cierre del modal post-cupón
+postRewardCloseBtn.onclick = () => { postRewardModal.style.display = 'none'; };
+postRewardModal.querySelector('.backdrop').onclick = () => { postRewardModal.style.display = 'none'; };
+
 
 /* ========= MODAL CONTINUAR ========= */
 const resumeModal = document.getElementById('resumeModal');
