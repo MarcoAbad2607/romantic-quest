@@ -106,33 +106,34 @@
     .popup-darktext .mapboxgl-popup-content{background:#fff;color:#000;font-weight:600}
     .popup-darktext .mapboxgl-popup-content .popup-sub{font-weight:500;opacity:.8;margin-top:2px}
     .popup-darktext .mapboxgl-popup-tip{border-top-color:#fff!important;border-bottom-color:#fff!important}
-  
-	/* Que los modales nunca tapen botones por contenido alto */
-.modal .content{
-  max-height: calc(100vh - 32px);
-  overflow: auto;              /* permite scroll si el contenido crece */
-  display: flex;
-  flex-direction: column;
-}
 
-/* Botonera siempre visible al fondo del modal */
-.modal .row{
-  position: sticky;
-  bottom: 0;
-  background: #141422;         /* mismo fondo del modal */
-  padding-top: 8px;
-  margin-top: 8px;
-}
-
-/* Solo para el modal de Uber: limita imagen grande */
-#finalRideModal img,
-.modal img.uber-responsive{
-  max-height: 42vh;            /* ajusta si lo quieres más chico/grande */
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-}
-
+    /* --- MODAL: que nunca tape los botones --- */
+    .modal .content{
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    /* Fila de botones siempre accesible y separada del contenido */
+    .modal .row{
+      position: sticky;
+      bottom: 0;
+      z-index: 1;
+      background: linear-gradient(180deg, rgba(20,20,34,0), #141422 50%);
+      padding-top: 8px;
+      margin-top: 8px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    }
+    /* Solo Uber: limitar imagen grande (gif/tarjeta) */
+    #finalRideCardImg{
+      max-height: 32vh;
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+    }
+    /* Pills largas no rompen layout */
+    #finalRideModal .pill{ gap:8px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -235,7 +236,7 @@
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=15</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=16</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -360,8 +361,8 @@ const FINAL_DESTINATION = {
 /* Tarjeta Uber + deep-link */
 const FINAL_RIDE = {
   enabled: true,
-  cardImg: "models/uber_gift.png",     // ← tu imagen de tarjeta
-  pin: "1234 5678 9012",               // ← tu PIN
+  cardImg: "models/uber_gift.png",
+  pin: "1234 5678 9012",
   dest: {
     lat: FINAL_DESTINATION.lat,
     lng: FINAL_DESTINATION.lng,
@@ -583,6 +584,18 @@ function updateTopHUD(distanceMap = {}){
 
 /* ========= UI PARADAS (ORDEN FORZADO) ========= */
 const stopsList = document.getElementById('stopsList');
+function buildUberLink(lat, lng, label, address){
+  const base = "https://m.uber.com/ul/";
+  const params = new URLSearchParams();
+  params.set("action", "setPickup");
+  params.set("pickup", "my_location");
+  params.set("dropoff[latitude]", String(lat));
+  params.set("dropoff[longitude]", String(lng));
+  if (label) params.set("dropoff[nickname]", label);
+  if (address) params.set("dropoff[formatted_address]", address);
+  return `${base}?${params.toString()}`;
+}
+
 function renderStops(distanceMap = {}) {
   stopsList.innerHTML = "";
   const current = getNextStop();
@@ -636,7 +649,7 @@ function renderStops(distanceMap = {}) {
     link.textContent = FINAL_DESTINATION.linkText;
     link.href = isIOS ? finalUrlApple : finalUrlGoogle;
 
-    // Botón "Pedir Uber" en tarjeta final
+    // Botón "Pedir Uber" en tarjeta final (deja href listo)
     const uberQuickLink = buildUberLink(
       FINAL_RIDE.dest?.lat ?? FINAL_DESTINATION.lat,
       FINAL_RIDE.dest?.lng ?? FINAL_DESTINATION.lng,
@@ -645,12 +658,14 @@ function renderStops(distanceMap = {}) {
     );
     const finalUberBtn = document.getElementById('finalUberBtn');
     finalUberBtn.href = uberQuickLink;
-	if (lastPos) {
-  fetchAndDrawRoute(
-    [lastPos.lng, lastPos.lat],
-    [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat]
-  );
-}
+
+    // Dibuja la ruta hacia el destino final si ya tenemos posición
+    if (lastPos) {
+      fetchAndDrawRoute(
+        [lastPos.lng, lastPos.lat],
+        [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat]
+      );
+    }
   }
 }
 renderStops();
@@ -978,6 +993,15 @@ const finalRideDestAddress = document.getElementById('finalRideDestAddress');
 const finalRideUberBtn = document.getElementById('finalRideUberBtn');
 const finalRideCloseBtn = document.getElementById('finalRideCloseBtn');
 
+// Botón "Pedir Uber" de la tarjeta final → abre modal (en vez de ir directo)
+const finalUberBtnEl = document.getElementById('finalUberBtn');
+if (finalUberBtnEl) {
+  finalUberBtnEl.addEventListener('click', (e)=>{
+    e.preventDefault();
+    showFinalRideModal();
+  });
+}
+
 let lastRewardId = null;
 
 function openStoryForStop(stopId, onContinue){
@@ -1044,18 +1068,6 @@ function showReward(id){
 
 function showStoryThenReward(stopId){
   openStoryForStop(stopId, ()=> showReward(stopId));
-}
-
-function buildUberLink(lat, lng, label, address){
-  const base = "https://m.uber.com/ul/";
-  const params = new URLSearchParams();
-  params.set("action", "setPickup");
-  params.set("pickup", "my_location");
-  params.set("dropoff[latitude]", String(lat));
-  params.set("dropoff[longitude]", String(lng));
-  if (label) params.set("dropoff[nickname]", label);
-  if (address) params.set("dropoff[formatted_address]", address);
-  return `${base}?${params.toString()}`;
 }
 
 function showFinalRideModal(){
@@ -1127,6 +1139,20 @@ resumeContinueBtn.onclick = ()=>{
   const nextAction = resumeModal.dataset.next || '';
   resumeModal.style.display = 'none';
   renderStops(lastDistances);
+
+  // Asegura GPS activo (para tener lastPos y dibujar ruta)
+  if (!watchId) startGPS();
+
+  // Si ya está en 3/3 al reanudar, dibuja ruta al final y abre modal Uber
+  if (found.size >= STOPS.length) {
+    setTimeout(()=>{
+      if (lastPos) {
+        fetchAndDrawRoute([lastPos.lng, lastPos.lat], [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat]);
+      }
+      showFinalRideModal();
+    }, 700);
+  }
+
   if (nextAction === 'start'){ beginStartFlow(); }
 };
 resumeModal.querySelector('.backdrop').onclick = ()=>{
