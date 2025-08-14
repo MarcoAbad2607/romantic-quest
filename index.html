@@ -70,7 +70,7 @@
     /* Avisos */
     #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
 
-    /* Modales (sobre landing) */
+    /* Modales */
     .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10003}
     .modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
     .modal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
@@ -207,7 +207,7 @@
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=11</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=12</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -272,15 +272,15 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
-  { id:"plaza",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 50000,
+  { id:"plaza",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 120,
     title:"Cine 🎬",
     message:"Aquí es donde me empecé a enamorar. Gracias por esta salida.",
     camImg:"models/regalo1.png" },
-  { id:"alameda", name:"Alameda", lat: 20.5866, lng: -100.3873, radius: 50000,
+  { id:"alameda", name:"Alameda", lat: 20.5866, lng: -100.3873, radius: 120,
     title:"El parque de las risas 🌳",
     message:"Prometo más salidas como esta.",
     camImg:"models/regalo2.png" },
-  { id:"maniatica", name:"Maniatica", lat: 20.5929, lng: -100.3921, radius: 50000,
+  { id:"maniatica", name:"Maniatica", lat: 20.5929, lng: -100.3921, radius: 120,
     title:"Nuestra primer cita ☕",
     message:"Perdón por decir eso ese día, espero esto lo compense jaja.",
     camImg:"models/regalo3.png" }
@@ -469,7 +469,11 @@ const hudNextFocus= document.getElementById('hudNextFocus');
 
 hudNextFocus.addEventListener('click', ()=>{
   const next = getNextStop();
-  if (next) map.flyTo({ center:[next.lng,next.lat], zoom:17, speed:0.8, curve:1.2 });
+  if (next) {
+    map.flyTo({ center:[next.lng,next.lat], zoom:17, speed:0.8, curve:1.2 });
+  } else {
+    map.flyTo({ center:[FINAL_DESTINATION.lng, FINAL_DESTINATION.lat], zoom:17, speed:0.8, curve:1.2 });
+  }
 });
 
 function updateTopHUD(distanceMap = {}){
@@ -489,7 +493,7 @@ function updateTopHUD(distanceMap = {}){
       const d = haversine(lastPos.lat, lastPos.lng, FINAL_DESTINATION.lat, FINAL_DESTINATION.lng);
       hudNextDist.textContent = `· ${fmtMeters(d)}`;
     } else { hudNextDist.textContent = ''; }
-    hudNextFocus.style.display = 'none';
+    hudNextFocus.style.display = '';
   }
 }
 
@@ -660,13 +664,12 @@ function updateDistances(pos){
     }
   }
 
-  // Ruta hacia la siguiente parada
+  // Ruta: a siguiente parada o al DESTINO FINAL si ya no quedan
   const next = getNextStop();
-  if (next){
-    const me = [lng, lat], dest = [next.lng, next.lat];
-    clearTimeout(updateDistances._t);
-    updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
-  }
+  const me = [lng, lat];
+  const dest = next ? [next.lng, next.lat] : [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat];
+  clearTimeout(updateDistances._t);
+  updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
 
   let bearing = headingFromCompass;
   if (bearing == null && lastPos){
@@ -957,14 +960,17 @@ function maybeOfferResume(){
   const got = found.size, total = STOPS.length;
   if (got > 0){
     resumeText.textContent = (got >= total)
-      ? `Ya reuniste todos los regalos anteriormente. ¿Quieres reiniciar el juego desde cero?`
+      ? `Ya reuniste todos los regalos anteriormente. ¿Quieres continuar al destino final o reiniciar desde cero?`
       : `Encontré progreso previo (${got}/${total} regalos). ¿Quieres continuar donde te quedaste o empezar desde cero?`;
     resumeModal.style.display = 'flex';
+    resumeModal.dataset.next = ''; // sin acción diferida
   }
 }
 resumeContinueBtn.onclick = ()=>{
+  const nextAction = resumeModal.dataset.next || '';
   resumeModal.style.display = 'none';
   renderStops(lastDistances);
+  if (nextAction === 'start'){ beginStartFlow(); }
 };
 resumeModal.querySelector('.backdrop').onclick = ()=>{
   resumeModal.style.display = 'none';
@@ -976,6 +982,8 @@ resumeResetBtn.onclick = ()=>{
   resumeModal.style.display = 'none';
   renderStops(lastDistances);
   showMsg('Progreso borrado. Empezamos desde Plaza ✨', 4000);
+  const nextAction = resumeModal.dataset.next || '';
+  if (nextAction === 'start'){ beginStartFlow(); }
 };
 
 /* ======== Flujo de inicio ======== */
@@ -988,9 +996,22 @@ const uiPanel = document.getElementById('uiPanel');
 function setPreGameUI(){ uiPanel.style.display = 'none'; document.getElementById('map').style.height = '100vh'; }
 setPreGameUI();
 
-landingStartBtn.addEventListener('click', ()=>{
+function beginStartFlow(){
   enterCssFullscreen();
   safety.style.display = 'flex';
+}
+
+landingStartBtn.addEventListener('click', ()=>{
+  // Si hay progreso (incluye 3/3), siempre preguntar primero
+  if (found.size > 0){
+    resumeModal.dataset.next = 'start';
+    resumeText.textContent = (found.size >= STOPS.length)
+      ? `Ya reuniste todos los regalos anteriormente. ¿Quieres continuar al destino final o reiniciar desde cero?`
+      : `Encontré progreso previo (${found.size}/${STOPS.length} regalos). ¿Quieres continuar donde te quedaste o empezar desde cero?`;
+    resumeModal.style.display = 'flex';
+    return;
+  }
+  beginStartFlow();
 });
 
 safetyOkBtn.addEventListener('click', ()=>{
@@ -1019,7 +1040,7 @@ throwHintBtn.addEventListener('click', ()=> showMsg('Toca cerca de la bola y des
 // Errores JS en pantalla
 window.addEventListener('error', (e)=>{ try{ showMsg('JS: ' + (e.message||'error')); }catch(_){ console.log(e); } });
 
-/* Llamar al prompt de continuar si había progreso */
+/* Llamar al prompt de continuar si había progreso (también aparecerá al tocar Iniciar) */
 maybeOfferResume();
 </script>
 </body>
