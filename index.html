@@ -320,7 +320,6 @@ function renderGallery(){
         <div style="font-size:12px;opacity:.9;margin-top:4px">${item.text}</div>
       </div>
       <div class="btns" style="flex-direction:column;gap:6px">
-        <a class="btn" href="${item.dataUrl}" download="${(item.title||'cupon').replace(/\s+/g,'_')}.png">Descargar</a>
         <button class="btn secondary" data-del="${item.id}">Eliminar</button>
       </div>
     `;
