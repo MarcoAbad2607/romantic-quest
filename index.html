@@ -106,6 +106,33 @@
     .popup-darktext .mapboxgl-popup-content{background:#fff;color:#000;font-weight:600}
     .popup-darktext .mapboxgl-popup-content .popup-sub{font-weight:500;opacity:.8;margin-top:2px}
     .popup-darktext .mapboxgl-popup-tip{border-top-color:#fff!important;border-bottom-color:#fff!important}
+  
+	/* Que los modales nunca tapen botones por contenido alto */
+.modal .content{
+  max-height: calc(100vh - 32px);
+  overflow: auto;              /* permite scroll si el contenido crece */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Botonera siempre visible al fondo del modal */
+.modal .row{
+  position: sticky;
+  bottom: 0;
+  background: #141422;         /* mismo fondo del modal */
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+/* Solo para el modal de Uber: limita imagen grande */
+#finalRideModal img,
+.modal img.uber-responsive{
+  max-height: 42vh;            /* ajusta si lo quieres más chico/grande */
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
   </style>
 </head>
 <body>
