@@ -856,30 +856,60 @@ async function saveImageToPhotos(r, defaultName){
 
 
 function showReward(id){
-  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png", url:"#cup" };
+  const r = REWARDS[id] || { title:"¡Premio!", text:"Cupón sorpresa desbloqueado.", img:"models/cupon_default.png" };
   rewardTitle.textContent = r.title;
   rewardText.textContent  = r.text;
   rewardImg.src = r.img;
 
-  // Guardar AUTOMÁTICO en galería interna
+  // Guardado automático en la galería interna
   saveCouponToGallery(id, r);
 
-  // Preparar descarga directa
+  // Nombre sugerido del archivo
   const filenameFromPath = (p)=>{
-    try{ const clean=p.split('#')[0].split('?')[0]; const name=clean.substring(clean.lastIndexOf('/')+1)||'cupon.png'; return name; }catch(_){ return 'cupon.png'; }
+    try{
+      const clean=p.split('#')[0].split('?')[0];
+      const name=clean.substring(clean.lastIndexOf('/')+1)||'cupon.png';
+      return name;
+    }catch(_){ return 'cupon.png'; }
   };
   const defaultName = filenameFromPath(r.img) || `cupon_${id||'amor'}.png`;
 
-
-
-  // Guardar en Fotos (iOS/soporte Web Share Level 2)
+  // Acción del botón "Guardar cupón"
   rewardSavePhotosBtn.onclick = async (ev)=>{
     ev.preventDefault();
-    await saveImageToPhotos(r, defaultName);
+    try{
+      const resp = await fetch(r.img, { cache:"no-cache" });
+      const blob = await resp.blob();
+      const file = new File([blob], defaultName, { type: blob.type || "image/png" });
+
+      // 1) Intentar hoja de compartir con archivos (iOS/Android modernos)
+      if (navigator.canShare && navigator.canShare({ files:[file] })) {
+        await navigator.share({ files:[file], title: r.title || "Cupón", text: r.text || "" });
+        showMsg('En la hoja del sistema elige "Guardar imagen" para enviarla a tu galería.');
+        return;
+      }
+
+      // 2) Fallback: descarga directa del PNG
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = defaultName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=> URL.revokeObjectURL(url), 1200);
+      showMsg('Cupón descargado 📥');
+    }catch(err){
+      console.error('No se pudo guardar el cupón:', err);
+      // 3) Último recurso: abrir en nueva pestaña para que lo guarde manualmente
+      window.open(r.img, '_blank');
+      showMsg('Abriendo el cupón… usa Compartir → Guardar imagen.');
+    }
   };
 
   rewardModal.style.display = 'flex';
 }
+
 rewardCloseBtn.addEventListener('click', ()=> rewardModal.style.display='none');
 rewardModal.querySelector('.backdrop').addEventListener('click', ()=> rewardModal.style.display='none');
 
