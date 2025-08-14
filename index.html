@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Amor GO</title>
 
-  <!-- Mapbox GL JS v2.15 (compatible iPhone) -->
+  <!-- Mapbox GL JS -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 
@@ -14,8 +14,12 @@
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#0e0e12;color:#f6f7fb}
-    header{padding:12px 12px calc(12px + env(safe-area-inset-top));border-bottom:1px solid #242438;position:sticky;top:0;background:linear-gradient(#111,#0e0e12);z-index:2;display:flex;gap:10px;align-items:center;justify-content:space-between}
+
+    header{padding:12px 12px calc(12px + env(safe-area-inset-top));
+      border-bottom:1px solid #242438;position:sticky;top:0;
+      background:linear-gradient(#111,#0e0e12);z-index:2;display:flex;gap:10px;align-items:center;justify-content:space-between}
     h1{margin:0;font-size:18px;color:#f6f7fb}
+
     /* HUD superior */
     .hud{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .hud .chip{background:#1b1b28;border:1px solid #2a2a3a;border-radius:999px;padding:6px 10px;font-size:12px;color:#dfe3f4}
@@ -64,34 +68,31 @@
     /* Avisos */
     #msgBar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:10000;background:#1b1b28;border:1px solid #2a2a3a;border-radius:12px;color:#fff;padding:10px 12px;display:none}
 
-    /* Modales genéricos */
+    /* Modales genéricos (z-index MÁS alto que landing) */
     .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10003}
     .modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
     .modal .content{position:relative;max-width:420px;margin:16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:16px;color:#fff}
     .modal .row{display:flex;gap:8px;justify-content:flex-end}
     .modal img{width:100%;border-radius:12px;margin:8px 0}
 
-    /* Específico: reward */
-    #rewardModal .content{max-width:420px}
     /* Específico: story */
     #storyModal .title{font-size:18px;font-weight:800;margin:0 0 6px}
     #storyModal .place{font-size:12px;opacity:.8;margin:0 0 8px}
     #storyModal .msg{margin:0 0 10px;opacity:.95}
 
-    /* Pantalla completa (fallback iOS) */
-    body.is-fs header, body.is-fs .wrap{display:none}
+    /* Pantalla completa (solo ocultamos panel inferior, NO el header) */
+    body.is-fs .wrap{display:none}
     body.is-fs #map{ position:fixed; inset:0; height:100vh!important; width:100vw!important; z-index:9990 }
+    body.is-fs header{ display:flex; position:fixed; top:0; left:0; right:0; z-index:9992 }
     body.is-fs .fs-exit{ position:fixed; top:12px; right:12px; z-index:9991; background:#2a2a39; color:#fff; border:0; border-radius:10px; padding:10px 14px; font-weight:600; display:block }
     .fs-exit{display:none}
 
-    /* === PANTALLA INICIAL === */
+    /* Landing */
     #landingOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:radial-gradient(1200px 600px at 50% 0%, #161624, #0e0e12);z-index:10002}
     #landingOverlay .title{font-size:32px;font-weight:900;letter-spacing:.5px;color:#fff}
     #landingOverlay .subtitle{opacity:.9;color:#eaeaf3}
     #landingOverlay .actions{display:flex;gap:10px;flex-wrap:wrap}
     #landingOverlay .hint{font-size:12px;color:#c9cde0}
-
-    /* Caja de instrucciones en landing */
     #landingOverlay .howBox{max-width:720px;margin:0 16px;background:#141422;border:1px solid #2a2a3a;border-radius:16px;padding:14px;color:#eaeaf3}
     #landingOverlay .howBox h3{margin:0 0 6px 0}
     #landingOverlay .howBox ol{margin:6px 0 0 18px; padding:0}
@@ -122,6 +123,7 @@
   </div>
 </header>
 
+<!-- Botón de salida para modo pantalla completa por CSS -->
 <button id="fsExitBtn" class="fs-exit">Salir de pantalla completa</button>
 
 <!-- LANDING -->
@@ -203,7 +205,7 @@
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=9</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=10</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -253,7 +255,7 @@
 mapboxgl.accessToken = 'pk.eyJ1IjoibWFyY29hYmFkMjYwNyIsImEiOiJjbWU0YjllMDIwMTRkMm1vcTRicmtwdDhhIn0.izoTZ1V7LrpiqPHIRzJo8Q';
 
 const STOPS = [
-  { id:"plaza",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 120,
+  { id:"plaza",   name:"Plaza Puerta la Victoria", lat: 20.5861, lng: -100.3814, radius: 50000,
     title:"Cine 🎬",
     message:"Aquí es donde me empecé a enamorar. Gracias por esta salida.",
     camImg:"models/regalo1.png" },
@@ -466,7 +468,6 @@ function updateTopHUD(distanceMap = {}){
     hudNextFocus.style.display = '';
   } else {
     hudNextName.textContent = 'Destino final';
-    // Distancia al final si tenemos localización
     if (lastPos){
       const d = haversine(lastPos.lat, lastPos.lng, FINAL_DESTINATION.lat, FINAL_DESTINATION.lng);
       hudNextDist.textContent = `· ${fmtMeters(d)}`;
@@ -475,31 +476,37 @@ function updateTopHUD(distanceMap = {}){
   }
 }
 
-/* ========= UI PARADAS ========= */
+/* ========= UI PARADAS (ORDEN FORZADO) ========= */
 const stopsList = document.getElementById('stopsList');
 function renderStops(distanceMap = {}) {
   stopsList.innerHTML = "";
+  const current = getNextStop();
+  const currentId = current?.id;
+
   STOPS.forEach(s => {
     const isFound = found.has(s.id);
     const d = distanceMap[s.id];
     const canCatch = d != null && d <= s.radius;
+    const isCurrent = !isFound && (s.id === currentId);
 
     const div = document.createElement('div');
     div.className = "card stop" + (isFound ? " found" : "");
-    const camBtn = canCatch
+    const camBtn = (canCatch && isCurrent)
       ? `<button class="btn secondary" data-cam="${s.id}">Ver en cámara</button>`
-      : `<button class="btn secondary" disabled title="Acércate para usar cámara">Ver en cámara</button>`;
+      : `<button class="btn secondary" disabled title="${!isCurrent ? 'Aún no toca esta parada' : 'Acércate para usar cámara'}">Ver en cámara</button>`;
+
+    const stateLine = isFound ? "✅ regalo atrapado" : (isCurrent ? "➡️ siguiente objetivo" : "Pendiente");
 
     div.innerHTML = `
       <div>
-        <div><strong>${s.title}</strong></div>
+        <div><strong>${s.title}</strong> ${(!isFound && isCurrent ? `<span class="tag">Siguiente</span>` : ``)}</div>
         <div class="meta">Radio: ${s.radius} m · ${d!=null?`Distancia: ${fmtMeters(d)}`:""}</div>
-        <div class="meta">${isFound ? "✅ regalo atrapado" : "Pendiente"}</div>
+        <div class="meta">${stateLine}</div>
         ${isFound ? `<div class="pill">${s.message}</div>` : ""}
       </div>
       <div class="btns">
         ${camBtn}
-        <button data-id="${s.id}" class="btn" ${isFound || !canCatch ? "disabled":""}>
+        <button data-id="${s.id}" class="btn" ${isFound || !canCatch || !isCurrent ? "disabled":""}>
           Atrapar regalo
         </button>
       </div>`;
@@ -539,6 +546,8 @@ stopsList.addEventListener('click', (e)=>{
   const camBtn = e.target.closest('button[data-cam]');
   if (camBtn){
     const stopId = camBtn.getAttribute('data-cam');
+    const current = getNextStop();
+    if (!current || stopId !== current.id){ showMsg("Primero atrapa el regalo actual 😊"); return; }
     const stop = STOPS.find(x=>x.id===stopId);
     if (stop) openCamera(stop);
     return;
@@ -546,13 +555,16 @@ stopsList.addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-id]');
   if(!btn) return;
   const id = btn.getAttribute('data-id');
+
+  const current = getNextStop();
+  if (current && id !== current.id) { showMsg("Primero atrapa el regalo actual 😊"); return; }
+
   if (found.has(id)) return;
   found.add(id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
   btn.textContent = "¡Capturada!";
   btn.disabled = true;
   renderStops(lastDistances);
-  // NUEVO: secuencia historia -> cupón -> mensaje post
   showStoryThenReward(id);
 });
 
@@ -618,17 +630,20 @@ function updateDistances(pos){
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d; renderStops(d);
 
-  STOPS.forEach(s=>{
-    const inside = d[s.id] != null && d[s.id] <= s.radius;
-    if (inside && !found.has(s.id) && !promptedNear.has(s.id)){
-      promptedNear.add(s.id);
-      askCatchConfirm(s);
+  // Solo avisar para la parada actual
+  const must = getNextStop();
+  if (must) {
+    const inside = d[must.id] != null && d[must.id] <= must.radius;
+    if (inside && !found.has(must.id) && !promptedNear.has(must.id)){
+      promptedNear.add(must.id);
+      askCatchConfirm(must);
     }
-    if (!inside && promptedNear.has(s.id) && d[s.id] > s.radius * 1.2){
-      promptedNear.delete(s.id);
+    if (!inside && promptedNear.has(must.id) && d[must.id] > must.radius * 1.2){
+      promptedNear.delete(must.id);
     }
-  });
+  }
 
+  // Ruta hacia la siguiente parada
   const next = getNextStop();
   if (next){
     const me = [lng, lat], dest = [next.lng, next.lat];
@@ -673,35 +688,24 @@ function startGPS(){
     console.warn(err); showMsg("No se pudo obtener tu ubicación. Revisa permisos.");
   }, { enableHighAccuracy:true, maximumAge:1000, timeout:15000 });
 }
-
 document.getElementById('startBtn').addEventListener('click', startGPS);
 
-/* ========= Pantalla completa ========= */
+/* ========= Pantalla completa (SOLO CSS) ========= */
 const fsBtn = document.getElementById('fsBtn');
 const fsExitBtn = document.getElementById('fsExitBtn');
 const mapEl = document.getElementById('map');
 
-function enterNativeFullscreen(){ try{ const el = mapEl; const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen; if (req) { req.call(el); return true; } }catch(_){} return false; }
-function exitNativeFullscreen(){ try{ const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) { ex.call(document); return true; } }catch(_){} return false; }
 function enterCssFullscreen(){ document.body.classList.add('is-fs'); fsExitBtn.style.display = 'block'; map.resize(); }
 function exitCssFullscreen(){ document.body.classList.remove('is-fs'); fsExitBtn.style.display = 'none'; map.resize(); }
 
-fsBtn.addEventListener('click', ()=>{ const ok = enterNativeFullscreen(); if (!ok) enterCssFullscreen(); });
+fsBtn.addEventListener('click', ()=> enterCssFullscreen());
 fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
-['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
-  document.addEventListener(ev, ()=>{
-    const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-    if (inFs){ fsExitBtn.style.display = 'none'; map.resize(); }
-    else { exitCssFullscreen(); }
-  });
-});
 
 /* ========= CÁMARA + MINI-JUEGO ========= */
 const camOverlay = document.getElementById('camOverlay');
 const camVideo   = document.getElementById('camVideo');
 const camCanvas  = document.getElementById('camCanvas');
 const closeCam   = document.getElementById('closeCam');
-const throwHintBtn = document.getElementById('throwHintBtn');
 
 let camStream = null, currentStop = null;
 let W=0,H=0,DPR=Math.max(1,window.devicePixelRatio||1);
@@ -728,6 +732,10 @@ function resizeCanvas(){
 }
 
 async function openCamera(stop){
+  // Solo permitir cámara para la parada actual
+  const current = getNextStop();
+  if (!current || stop.id !== current.id){ showMsg("Primero atrapa el regalo actual 😊"); return; }
+
   currentStop = stop;
   camOverlay.style.display = "block";
   try{
@@ -817,14 +825,15 @@ function heartPath(ctx, s){ ctx.beginPath(); ctx.moveTo(0, s*0.6); ctx.bezierCur
 
 function onCaught(){
   const wonId = currentStop?.id;
-  if (wonId && !found.has(wonId)){
+  // Seguridad extra: solo marcar si coincide con la parada actual
+  if (wonId && getNextStop()?.id === wonId && !found.has(wonId)){
     found.add(wonId);
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...found]));
   }
   setTimeout(()=>{
     closeCamera();
     renderStops(lastDistances);
-    showStoryThenReward(wonId); // NUEVO flujo
+    showStoryThenReward(wonId);
   }, 120);
 }
 
@@ -861,28 +870,6 @@ function openStoryForStop(stopId, onContinue){
   };
   storyContinueBtn.onclick = proceed;
   storyModal.querySelector('.backdrop').onclick = proceed;
-}
-
-async function saveImageToPhotos(r, defaultName){
-  try{
-    const resp = await fetch(r.img, { cache: "no-cache" });
-    const blob = await resp.blob();
-    const fileType = blob.type || "image/png";
-    const file = new File([blob], defaultName || "cupon.png", { type: fileType });
-
-    const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
-    if (canShareFiles){
-      await navigator.share({ files: [file], title: r.title || "Cupón", text: r.text || "" });
-      showMsg('En la hoja del sistema elige "Guardar imagen" para enviarla a tu galería.');
-    } else {
-      window.open(r.img, "_blank");
-      showMsg('Tu navegador no permite enviar a Fotos. Abre y toca Compartir → Guardar imagen.');
-    }
-  }catch(err){
-    console.error("No se pudo abrir la hoja de compartir:", err);
-    window.open(r.img, "_blank");
-    showMsg('No se pudo lanzar compartir. Abriendo imagen para que puedas guardarla.');
-  }
 }
 
 function showReward(id){
@@ -922,7 +909,6 @@ function showReward(id){
     }
   };
 
-  // Cierre del modal con mensaje post-cupón
   const closeReward = ()=>{
     rewardModal.style.display = 'none';
     showPostRewardMessage(lastRewardId);
@@ -937,9 +923,7 @@ function showReward(id){
 function showStoryThenReward(stopId){
   openStoryForStop(stopId, ()=> showReward(stopId));
 }
-
 function showPostRewardMessage(stopId){
-  // Si ya no hay siguientes, avisar del final
   const next = getNextStop();
   if (next){
     const d = lastDistances?.[next.id];
@@ -961,7 +945,12 @@ const uiPanel = document.getElementById('uiPanel');
 function setPreGameUI(){ uiPanel.style.display = 'none'; document.getElementById('map').style.height = '100vh'; }
 setPreGameUI();
 
-landingStartBtn.addEventListener('click', ()=>{ const ok = enterNativeFullscreen(); if (!ok) enterCssFullscreen(); safety.style.display = 'flex'; });
+landingStartBtn.addEventListener('click', ()=>{
+  // Usar SIEMPRE fullscreen CSS para mantener HUD visible
+  enterCssFullscreen();
+  safety.style.display = 'flex';
+});
+
 safetyOkBtn.addEventListener('click', ()=>{
   safety.style.display = 'none';
   landing.style.display = 'none';
@@ -971,11 +960,21 @@ safetyOkBtn.addEventListener('click', ()=>{
   showMsg(`Paradas: ${firstRoute}`, 6000);
 });
 
+// Reinicio progreso
+const resetBtn = document.getElementById('resetBtn');
+resetBtn.addEventListener('click', ()=>{
+  localStorage.removeItem(STORAGE_KEY);
+  found = new Set();
+  promptedNear = new Set();
+  renderStops(lastDistances);
+  showMsg("Progreso reiniciado. 🎯");
+});
+
 // Ayuda
 document.getElementById('closeCam').addEventListener('click', closeCamera);
 document.getElementById('throwHintBtn').addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia el regalo. Si fallas, intenta con otra dirección.'));
 
- // Extra: muestra errores JS en pantalla
+// Extra: errores JS en pantalla
 window.addEventListener('error', (e)=>{ try{ showMsg('JS: ' + (e.message||'error')); }catch(_){ console.log(e); } });
 </script>
 </body>
