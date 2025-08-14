@@ -187,7 +187,10 @@
   <div id="finalCard" class="card final" style="display:none;">
     <div class="flex"><span class="tag">¡Última misión desbloqueada!</span></div>
     <p id="finalMsg" style="margin:8px 0 0 0;"></p>
-    <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
+    <div class="btns" style="justify-content:flex-start">
+      <a id="finalLink" class="btn" target="_blank" rel="noopener">Abrir ubicación final</a>
+      <a id="finalUberBtn" class="btn secondary" target="_blank" rel="noopener">Pedir Uber</a>
+    </div>
   </div>
 
   <!-- Galería de cupones -->
@@ -205,7 +208,7 @@
   </div>
 
   <p class="footer-note">
-    Tip: si algo no carga, abre con <code>?v=14</code> para forzar recarga (caché).
+    Tip: si algo no carga, abre con <code>?v=15</code> para forzar recarga (caché).
   </p>
 </div>
 
@@ -265,7 +268,7 @@
   </div>
 </div>
 
-<!-- Modal post-cupón -->
+<!-- Modal post-cupón (mensajes de siguiente paso) -->
 <div id="postRewardModal" class="modal">
   <div class="backdrop"></div>
   <div class="content">
@@ -273,6 +276,31 @@
     <p id="postRewardText" style="opacity:.9;margin:6px 0 10px 0;"></p>
     <div class="row">
       <button id="postRewardCloseBtn" class="btn" type="button">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal viaje final (Uber) -->
+<div id="finalRideModal" class="modal">
+  <div class="backdrop"></div>
+  <div class="content">
+    <h3 style="margin:0 0 8px 0;">Último destino 🚗</h3>
+    <p id="finalRideMsg" style="opacity:.9;margin:6px 0 10px 0;">
+      Para este último destino tendremos que pedir un Uber. Aquí tienes tu tarjeta de regalo:
+    </p>
+    <img id="finalRideCardImg" alt="Tarjeta de regalo Uber" />
+    <div class="pill" style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span><strong>PIN:</strong> <span id="finalRidePin" style="letter-spacing:1px"></span></span>
+      <button id="finalRideCopyBtn" class="btn secondary" type="button">Copiar PIN</button>
+    </div>
+    <div class="pill" style="margin:8px 0;">
+      <div style="font-size:12px;opacity:.85">Destino:</div>
+      <div id="finalRideDestLabel" style="font-weight:700"></div>
+      <div id="finalRideDestAddress" style="font-size:12px;opacity:.8"></div>
+    </div>
+    <div class="row">
+      <a id="finalRideUberBtn" class="btn" target="_blank" rel="noopener">Pedir Uber</a>
+      <button id="finalRideCloseBtn" class="btn secondary" type="button">Cerrar</button>
     </div>
   </div>
 </div>
@@ -302,6 +330,19 @@ const FINAL_DESTINATION = {
   linkText: "Navegar al destino final",
 };
 
+/* Tarjeta Uber + deep-link */
+const FINAL_RIDE = {
+  enabled: true,
+  cardImg: "models/uber_gift.png",     // ← tu imagen de tarjeta
+  pin: "1234 5678 9012",               // ← tu PIN
+  dest: {
+    lat: FINAL_DESTINATION.lat,
+    lng: FINAL_DESTINATION.lng,
+    label: "Destino final 💛",
+    address: "Dirección completa aquí"
+  }
+};
+
 const REWARDS = {
   plaza:   { title:"Cupón de café/cine☕🎬", text:"Vale por un café juntos en Puerta la Victoria. (Solo válido con besos incluidos)", img:"models/cupon_plaza.png" },
   alameda: { title:"Cupón roles 🥯👨‍🍳", text:"Vale por roles de canela: comprados o preparados por mí.", img:"models/cupon_alameda.png" },
@@ -310,9 +351,9 @@ const REWARDS = {
 
 const POST_REWARD_MESSAGES = {
   default: "Amor, ve a recoger un regalito en la siguiente parada 💛",
-  plaza: "Listo el primer detalle. ¡Vamos por el siguiente regalito! 🚶",
+  plaza: "Listo el primer detalle. ¡Vamos por el siguiente regalito! Dirigete a Miniso en Plaza Victoria, pregunta por un regalo para Armando. 🚶",
   alameda: "Hermoso. Te espera otro regalo adelante. 🌟",
-  maniatica: "¡Casi llegamos! Pasa por tu siguiente regalo. 🎁"
+  maniatica: "¡Casi llegamos! Pasa por tu siguiente regalo a Maniatica, pregunta por un regalo con tu nombre. 🎁"
 };
 
 const DIFFICULTY = { cardSpeedMin: 80, cardSpeedMax: 180, wobbleAmp: 6, wobbleFreq: 2.2 };
@@ -387,12 +428,12 @@ if (clearBtn) {
 }
 renderGallery();
 
-/* ========= ESTADO GLOBAL (DECLARADO TEMPRANO: evita TDZ) ========= */
+/* ========= ESTADO GLOBAL ========= */
 let watchId = null;
 let lastDistances = {};
 let myMarker = null;
 let walkingMode = false;
-let lastPos = null;            // <-- ahora existe antes de updateTopHUD()
+let lastPos = null;
 let headingFromCompass = null;
 let promptedNear = new Set();
 
@@ -407,19 +448,17 @@ function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = x => x * Math.PI / 180;
   const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1); // ✅ corregido
+  const dLon = toRad(lon2 - lon1);
   const a = Math.sin(dLat/2)**2
           + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
-
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
 /* ========= MAPA ========= */
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/navigation-day-v1', // Nota: este estilo intenta cargar "incidents". Los 404 son inofensivos.
-  // Si quieres silenciar esos 404, usa: 'mapbox://styles/mapbox/streets-v12'
+  style: 'mapbox://styles/mapbox/navigation-day-v1', // si molesta el 404 de incidents, usa 'mapbox://styles/mapbox/streets-v12'
   center: [-100.389, 20.595],
   zoom: 15.5,
   pitch: 60,
@@ -569,6 +608,16 @@ function renderStops(distanceMap = {}) {
     const link = document.getElementById('finalLink');
     link.textContent = FINAL_DESTINATION.linkText;
     link.href = isIOS ? finalUrlApple : finalUrlGoogle;
+
+    // Botón "Pedir Uber" en tarjeta final
+    const uberQuickLink = buildUberLink(
+      FINAL_RIDE.dest?.lat ?? FINAL_DESTINATION.lat,
+      FINAL_RIDE.dest?.lng ?? FINAL_DESTINATION.lng,
+      FINAL_RIDE.dest?.label || "Destino final",
+      FINAL_RIDE.dest?.address || ""
+    );
+    const finalUberBtn = document.getElementById('finalUberBtn');
+    finalUberBtn.href = uberQuickLink;
   }
 }
 renderStops();
@@ -678,7 +727,7 @@ function updateDistances(pos){
 
   const next = getNextStop();
   const me = [lng, lat];
-  const dest = next ? [next.lng, next.lat] : [FINAL_DESTINATION.lng, FINAL_DESTINATION.lat];
+  const dest = next ? [next.lng, next.lat] : [FINAL_DESTINATION.lng, FINAL_DESTINATION.lng];
   clearTimeout(updateDistances._t);
   updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
 
@@ -886,6 +935,15 @@ const postRewardModal = document.getElementById('postRewardModal');
 const postRewardText  = document.getElementById('postRewardText');
 const postRewardCloseBtn = document.getElementById('postRewardCloseBtn');
 
+// Final ride modal
+const finalRideModal = document.getElementById('finalRideModal');
+const finalRideCardImg = document.getElementById('finalRideCardImg');
+const finalRidePin = document.getElementById('finalRidePin');
+const finalRideCopyBtn = document.getElementById('finalRideCopyBtn');
+const finalRideDestLabel = document.getElementById('finalRideDestLabel');
+const finalRideDestAddress = document.getElementById('finalRideDestAddress');
+const finalRideUberBtn = document.getElementById('finalRideUberBtn');
+const finalRideCloseBtn = document.getElementById('finalRideCloseBtn');
 
 let lastRewardId = null;
 
@@ -954,28 +1012,67 @@ function showReward(id){
 function showStoryThenReward(stopId){
   openStoryForStop(stopId, ()=> showReward(stopId));
 }
+
+function buildUberLink(lat, lng, label, address){
+  const base = "https://m.uber.com/ul/";
+  const params = new URLSearchParams();
+  params.set("action", "setPickup");
+  params.set("pickup", "my_location");
+  params.set("dropoff[latitude]", String(lat));
+  params.set("dropoff[longitude]", String(lng));
+  if (label) params.set("dropoff[nickname]", label);
+  if (address) params.set("dropoff[formatted_address]", address);
+  return `${base}?${params.toString()}`;
+}
+
+function showFinalRideModal(){
+  if (!FINAL_RIDE?.enabled) return;
+
+  finalRideCardImg.src = FINAL_RIDE.cardImg || "models/uber_gift.png";
+  finalRidePin.textContent = FINAL_RIDE.pin || "—";
+  finalRideDestLabel.textContent = FINAL_RIDE.dest?.label || "Destino final";
+  finalRideDestAddress.textContent = FINAL_RIDE.dest?.address || "";
+
+  const link = buildUberLink(
+    FINAL_RIDE.dest?.lat ?? FINAL_DESTINATION.lat,
+    FINAL_RIDE.dest?.lng ?? FINAL_DESTINATION.lng,
+    FINAL_RIDE.dest?.label || "Destino final",
+    FINAL_RIDE.dest?.address || ""
+  );
+  finalRideUberBtn.href = link;
+
+  finalRideCopyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(FINAL_RIDE.pin || "");
+      showMsg("PIN copiado ✅");
+    } catch {
+      showMsg("No se pudo copiar, cópialo manualmente.");
+    }
+  };
+  const close = () => finalRideModal.style.display = 'none';
+  finalRideCloseBtn.onclick = close;
+  finalRideModal.querySelector('.backdrop').onclick = close;
+
+  finalRideModal.style.display = 'flex';
+}
+
 function showPostRewardMessage(stopId){
   const next = getNextStop();
-  let msg = POST_REWARD_MESSAGES[stopId] || POST_REWARD_MESSAGES.default;
-
   if (next){
+    let msg = POST_REWARD_MESSAGES[stopId] || POST_REWARD_MESSAGES.default;
     const d = lastDistances?.[next.id];
     msg += d!=null
       ? `\n\nSiguiente: ${next.name || next.title} (${fmtMeters(d)}).`
       : `\n\nSiguiente: ${next.name || next.title}.`;
+    postRewardText.innerText = msg;
+    postRewardModal.style.display = 'flex';
   } else {
-    msg = "¡Reuniste todos los regalos! 💛 Abre el destino final.";
+    // No hay siguiente: mostrar modal de Uber
+    showFinalRideModal();
   }
-
-  // Mostrar en modal
-  postRewardText.innerText = msg;  // (innerText conserva los saltos de línea)
-  postRewardModal.style.display = 'flex';
 }
-
-// Cierre del modal post-cupón
 postRewardCloseBtn.onclick = () => { postRewardModal.style.display = 'none'; };
 postRewardModal.querySelector('.backdrop').onclick = () => { postRewardModal.style.display = 'none'; };
-
 
 /* ========= MODAL CONTINUAR ========= */
 const resumeModal = document.getElementById('resumeModal');
@@ -990,7 +1087,7 @@ function maybeOfferResume(){
       ? `Ya reuniste todos los regalos anteriormente. ¿Quieres continuar al destino final o reiniciar desde cero?`
       : `Encontré progreso previo (${got}/${total} regalos). ¿Quieres continuar donde te quedaste o empezar desde cero?`;
     resumeModal.style.display = 'flex';
-    resumeModal.dataset.next = ''; // sin acción diferida
+    resumeModal.dataset.next = '';
   }
 }
 resumeContinueBtn.onclick = ()=>{
