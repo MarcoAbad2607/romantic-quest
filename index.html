@@ -359,13 +359,13 @@ function showMsg(text, ms=3200){
 }
 function fmtMeters(m){ if (m==null) return ""; if (m<1000) return `${Math.round(m)} m`; const km=m/1000; return km>=10?`${Math.round(km)} km`:`${km.toFixed(1)} km`; }
 function haversine(lat1, lon1, lat2, lon2) {
-  const R=6371000, toRad=x=>x*Math.PI/180, dLat=toRad(lat2-lat1), dLon=toRad(lat2-lon1);
+  const R=6371000, toRad=x=>x*Math.PI/180, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
   const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
 function rand(min,max){ return Math.random()*(max-min)+min; }
 
-/* ========= MAPA ========= */
+/* ========= MAPA (plano navegación) ========= */
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/navigation-day-v1',
@@ -377,7 +377,9 @@ const map = new mapboxgl.Map({
 });
 map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
 
-map.on('style.load', () => { addStopMarkers(); });
+map.on('style.load', () => {
+  addStopMarkers();
+});
 				   
    
 
@@ -394,7 +396,8 @@ function addStopMarkers(){
     new mapboxgl.Marker(el, {anchor:'center'})
       .setLngLat([s.lng, s.lat])
 																			   
-      .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' }).setHTML(`<div><strong>${s.name || s.title}</strong><div class="popup-sub">${s.title}</div></div>`))
+      .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' })
+        .setHTML(`<div><strong>${s.name || s.title}</strong><div class="popup-sub">${s.title}</div></div>`))
       .addTo(map);
   });
 
@@ -406,8 +409,9 @@ function addStopMarkers(){
     </svg>`;
   new mapboxgl.Marker(elf, {anchor:'center'})
     .setLngLat([FINAL_DESTINATION.lng, FINAL_DESTINATION.lat])
-																			 
-    .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' }).setHTML('<div><strong>Destino final 💛</strong><div class="popup-sub">¡No veas el spoiler hasta juntar todo!</div></div>'))
+					
+    .setPopup(new mapboxgl.Popup({ offset: 18, className: 'popup-darktext' })
+      .setHTML('<div><strong>Destino final 💛</strong><div class="popup-sub">¡No veas el spoiler hasta juntar todo!</div></div>'))
     .addTo(map);
 }
 
@@ -425,15 +429,15 @@ async function fetchAndDrawRoute(fromLngLat, toLngLat){
   if (!toLngLat) return;
   const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`;
    
-		 
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.routes && data.routes[0]){
-      const gj = { type:'FeatureCollection', features:[{ type:'Feature', geometry:data.routes[0].geometry, properties:{} }] };
-      drawRoute(gj);
-    }
-  } catch(e){ console.warn('No se pudo obtener la ruta', e); }
+   
+	  
+								 
+  try{ const res = await fetch(url); const data = await res.json();
+									   
+    if (data.routes && data.routes[0]){ const gj = { type:'FeatureCollection', features:[{ type:'Feature', geometry:data.routes[0].geometry, properties:{} }] }; drawRoute(gj);} }
+					
+	 
+  catch(e){ console.warn('No se pudo obtener la ruta', e); }
 }
 
 /* ========= UI PARADAS ========= */
@@ -533,27 +537,27 @@ resetBtn.addEventListener('click', ()=>{
   showMsg("Progreso reiniciado. 🎯");
 });
 
-/* ========= GPS + caminata + avatar ========= */
+/* ========= GPS + ruta + MODO CAMINATA + AVATAR ========= */
 let watchId = null;
 let lastDistances = {};
 let myMarker = null;
 let walkingMode = false;
 let lastPos = null;
 let headingFromCompass = null;
-let promptedNear = new Set();
+let promptedNear = new Set(); // para no spamear avisos cerca de cada parada
 
 function applyAvatarMotion(speedMps, bearingDeg){
   const img = myMarker?.getElement().querySelector('.avatar');
   if (!img) return;
   if (typeof bearingDeg === 'number') img.style.setProperty('--rot', `${bearingDeg}deg`);
-  if (speedMps > 0.6) {
-    img.classList.add('walk'); img.classList.remove('idle');
-    const step = Math.max(260, Math.min(700, 1200/(speedMps + 0.5)));
-    img.style.setProperty('--stepDur', `${Math.round(step)}ms`);
-	
-  } else {
-    img.classList.add('idle'); img.classList.remove('walk'); img.style.removeProperty('--stepDur');
-  }
+  if (speedMps > 0.6) { img.classList.add('walk'); img.classList.remove('idle'); const step = Math.max(260, Math.min(700, 1200/(speedMps + 0.5))); img.style.setProperty('--stepDur', `${Math.round(step)}ms`); }
+															
+																	 
+																
+ 
+		  
+  else { img.classList.add('idle'); img.classList.remove('walk'); img.style.removeProperty('--stepDur'); }
+   
 }
 
 const walkBtn = document.getElementById('walkBtn');
@@ -565,8 +569,8 @@ walkBtn.addEventListener('click', async ()=>{
       const res = await DeviceOrientationEvent.requestPermission();
       if (res !== 'granted') showMsg("Sin permiso de brújula. Usaré dirección de movimiento.");
     }
-  }catch(_){}
-});
+  }catch(_){}}
+);
 
 window.addEventListener('deviceorientation', (e)=>{
   const ios = (typeof e.webkitCompassHeading === 'number') ? e.webkitCompassHeading : null;
@@ -578,7 +582,7 @@ function updateDistances(pos){
   const { latitude:lat, longitude:lng } = pos.coords;
   const nowTs = (typeof pos.timestamp==='number') ? pos.timestamp : Date.now();
 
-								   
+  // Crear/actualizar avatar marker
   if (!myMarker){
     const wrap = document.createElement('div');
     wrap.className = 'avatar-wrap';
@@ -594,11 +598,11 @@ function updateDistances(pos){
     map.easeTo({ center:[lng, lat], zoom:16, duration:600 });
   } else { myMarker.setLngLat([lng, lat]); }
 
-					
+  // Distancias + UI
   const d = {}; STOPS.forEach(s => d[s.id] = haversine(lat,lng,s.lat,s.lng));
   lastDistances = d; renderStops(d);
 
-									 
+  // Aviso automático al estar cerca
   STOPS.forEach(s=>{
     const inside = d[s.id] != null && d[s.id] <= s.radius;
     if (inside && !found.has(s.id) && !promptedNear.has(s.id)){
@@ -610,7 +614,7 @@ function updateDistances(pos){
     }
   });
 
-								   
+  // Ruta hacia la siguiente parada
   const next = getNextStop();
   if (next){
     const me = [lng, lat], dest = [next.lng, next.lat];
@@ -618,7 +622,7 @@ function updateDistances(pos){
     updateDistances._t = setTimeout(()=> fetchAndDrawRoute(me, dest), 300);
   }
 
-		  
+  // Rumbo
   let bearing = headingFromCompass;
   if (bearing == null && lastPos){
     const dy = lat - lastPos.lat, dx = lng - lastPos.lng;
@@ -633,7 +637,7 @@ function updateDistances(pos){
     bearing = (toDeg(Math.atan2(y,x))+360)%360;
   }
 
-					
+  // Velocidad (m/s)
   let speed = 0;
   if (lastPos?.ts) {
     const dt = Math.max(0.2, (nowTs - lastPos.ts)/1000);
@@ -660,7 +664,7 @@ function startGPS(){
 
 document.getElementById('startBtn').addEventListener('click', startGPS);
 
-/* ========= Pantalla completa ========= */
+/* ========= Pantalla completa (con fallback para iOS) ========= */
 const fsBtn = document.getElementById('fsBtn');
 const fsExitBtn = document.getElementById('fsExitBtn');
 const mapEl = document.getElementById('map');
@@ -673,12 +677,9 @@ function exitCssFullscreen(){ document.body.classList.remove('is-fs'); fsExitBtn
 fsBtn.addEventListener('click', ()=>{ const ok = enterNativeFullscreen(); if (!ok) enterCssFullscreen(); });
 fsExitBtn.addEventListener('click', ()=> exitCssFullscreen());
 ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>{
-		  
-  document.addEventListener(ev, ()=>{
-    const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
-    if (inFs){ fsExitBtn.style.display = 'none'; map.resize(); }
-    else { exitCssFullscreen(); }
-  });
+	
+									 
+  document.addEventListener(ev, ()=>{ const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement); if (inFs){ fsExitBtn.style.display = 'none'; map.resize(); } else { exitCssFullscreen(); } });
 });
 
 /* ========= CÁMARA + MINI-JUEGO ========= */
