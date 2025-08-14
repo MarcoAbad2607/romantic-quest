@@ -919,15 +919,32 @@ function loop(ts){
   const dt = Math.min(0.033, (ts-game.last)/1000); game.last = ts;
   const b=game.ball, t=game.card;
 
-  if(t){
-    t.t += dt; t.x += t.vx*dt; t.y += t.vy*dt;
-    const wobble = Math.sin(t.t * (Math.PI*2*DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
-    if (t.y < 6) { t.y = 6; t.vy *= -1; }
-if (t.y + t.h > H * 0.75) { t.y = H * 0.75 - t.h; t.vy *= -1; }
-    const drawY = t.y + wobble;
-    ctx.clearRect(0,0,W,H);
-    ctx.drawImage(t.img, t.x, drawY, t.w, t.h);
-  } else { ctx.clearRect(0,0,W,H); }
+if (t) {
+  t.t += dt;
+  t.x += t.vx * dt;
+  t.y += t.vy * dt;
+
+  const wobble = Math.sin(t.t * (Math.PI * 2 * DIFFICULTY.wobbleFreq)) * DIFFICULTY.wobbleAmp;
+
+  // Márgenes seguros (deja un padding de 6px y reserva el wobble en Y)
+  const left   = 6;
+  const right  = W - 6 - t.w;
+  const top    = 6 + DIFFICULTY.wobbleAmp;
+  const bottom = H * 0.75 - t.h - DIFFICULTY.wobbleAmp;
+
+  // Rebotar en X (🔥 esto evita que se salga horizontalmente)
+  if (t.x < left)  { t.x = left;  t.vx *= -1; }
+  if (t.x > right) { t.x = right; t.vx *= -1; }
+
+  // Rebotar en Y dentro de la “zona de juego”
+  if (t.y < top)    { t.y = top;    t.vy *= -1; }
+  if (t.y > bottom) { t.y = bottom; t.vy *= -1; }
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(t.img, t.x, t.y + wobble, t.w, t.h);
+} else {
+  ctx.clearRect(0, 0, W, H);
+}
 
   if(b){
     if(b.flying){ b.vy += game.gravity*dt; b.x += b.vx*dt; b.y += b.vy*dt; }
