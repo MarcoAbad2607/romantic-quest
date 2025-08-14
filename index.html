@@ -929,11 +929,11 @@ safetyOkBtn.addEventListener('click', ()=>{
   showMsg(`Paradas: ${firstRoute}`, 6000);
 });
 
-// Ayuda y cierre cámara
-														
-closeCam.addEventListener('click', closeCamera);
-															  
-throwHintBtn.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia el regalo. Si fallas, intenta con otra dirección.'));
+// Ayuda
+const closeCamBtn = document.getElementById('closeCam');
+closeCamBtn.addEventListener('click', closeCamera);
+const throwHintBtn2 = document.getElementById('throwHintBtn');
+throwHintBtn2.addEventListener('click', ()=> showMsg('Toca cerca de la bola y desliza hacia el regalo. Si fallas, intenta con otra dirección.'));
 
  // Extra: muestra errores JS en pantalla
 window.addEventListener('error', (e)=>{ try{ showMsg('JS: ' + (e.message||'error')); }catch(_){ console.log(e); } });
